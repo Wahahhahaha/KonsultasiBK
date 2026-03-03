@@ -166,30 +166,61 @@
     const levelSelect = document.getElementById('levelSelect');
     const roleSelect = document.getElementById('roleSelect');
 
-    levelSelect.addEventListener('change', function () {
-        if (this.value == 3) {
+    function updateRoleOptions() {
+        const level = levelSelect.value;
+
+        // reset semua option dulu
+        for (let i = 0; i < roleSelect.options.length; i++) {
+            roleSelect.options[i].disabled = false;
+        }
+
+        // kondisi berdasarkan level
+        if (level == 1) {
+            // disable role 3 & 4
+            disableRole([3,4]);
+            roleSelect.disabled = false;
+        } 
+        else if (level == 2) {
+            // disable role 1 & 2
+            disableRole([1,2]);
+            roleSelect.disabled = false;
+        } 
+        else if (level == 3) {
+            // disable semua role
             roleSelect.disabled = true;
-            roleSelect.value = ""; // reset pilihan
-        } else {
+            roleSelect.value = "";
+        } 
+        else {
             roleSelect.disabled = false;
         }
+    }
+
+    function disableRole(roleIds) {
+        for (let i = 0; i < roleSelect.options.length; i++) {
+            const val = parseInt(roleSelect.options[i].value);
+            if (roleIds.includes(val)) {
+                roleSelect.options[i].disabled = true;
+
+                // kalau yang ke-select ternyata di-disable → reset
+                if (roleSelect.value == val) {
+                    roleSelect.value = "";
+                }
+            }
+        }
+    }
+
+    levelSelect.addEventListener('change', updateRoleOptions);
+
+    // jalan saat pertama load (old value)
+    document.addEventListener('DOMContentLoaded', function() {
+        updateRoleOptions();
     });
 
-    // Auto open modal if there are validation errors
+    // Auto open modal if validation error
     @if($errors->any())
         document.addEventListener('DOMContentLoaded', function() {
             const modal = new bootstrap.Modal(document.getElementById('addUser'));
             modal.show();
         });
     @endif
-
-    // Initialize role select state based on selected level
-    document.addEventListener('DOMContentLoaded', function() {
-        const selectedLevel = levelSelect.value;
-        if (selectedLevel == 3) {
-            roleSelect.disabled = true;
-        } else {
-            roleSelect.disabled = false;
-        }
-    });
 </script>

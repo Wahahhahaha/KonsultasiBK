@@ -4,6 +4,9 @@
             <div class="col-md-6">
                <div class="row justify-content-center">
                   <div class="col-md-10">
+                     <h2 class="mb-2 mt-3 text-left"><img src="<?= asset('storage/' . $system->systemlogo) ?>" style="width: 80px;" class="img-fluid"></h2>
+                        <h1 class="mb-6 text-left"><?= $system->systemname ?></h2>
+
                      <div class="card card-transparent shadow-none d-flex justify-content-center mb-0 auth-card">
                         <div class="card-body z-3 px-md-0 px-lg-4">
                            <a href="/home" class="navbar-brand d-flex align-items-center mb-3">
@@ -28,12 +31,8 @@
                                        <input type="password" class="form-control" name="password" id="password" aria-describedby="password" placeholder=" ">
                                     </div>
                                  </div>
-                                 <div class="col-lg-12 d-flex justify-content-between">
-                                    <div class="form-check mb-3">
-                                       <input type="checkbox" class="form-check-input" id="customCheck1">
-                                       <label class="form-check-label" for="customCheck1">Remember Me</label>
-                                    </div>
-                                    <a href="recoverpw.html">Forgot Password?</a>
+                                 <div class="col-lg-12  justify-content-between" style="padding-top: 15px; padding-bottom: 15px;">
+                                    <a href="recoverpw.html" style="text-align: center;">Forgot Password?</a>
                                  </div>
                               </div>
                               <div class="d-flex justify-content-center">
