@@ -76,12 +76,15 @@
                                                 </div>
                                             @endif
                                             <button class="btn btn-warning btn-sm" id="btn-end" onclick="endConsult()" style="display: none;">End Conversation</button>
+                                            @if(session('level') == 2)
+                                            <button class="btn btn-info btn-sm ms-2" id="btn-report" onclick="openReportModal()" style="display: none;">Submit Report</button>
+                                            @endif
                                         </div>
                                     </div>
                                 </div>
 
                                 <!-- Wait Area (Locked) -->
-                                <div id="chat-wait" class="flex-grow-1 d-flex align-items-center justify-content-center flex-column" style="display: none;">
+                                <div id="chat-wait" class="flex-grow-1 d-flex align-items-center justify-content-center flex-column d-none">
                                     <div class="text-center">
                                         <i class="fas fa-lock fa-5x text-secondary mb-4" style="opacity: 0.5;"></i>
                                         <h4 id="wait-message" class="font-weight-medium text-dark">Waiting for Teacher to Approve</h4>
@@ -90,7 +93,7 @@
                                 </div>
 
                                 <!-- Active Chat Area -->
-                                <div id="chat-active" class="flex-grow-1 d-flex flex-column" style="display: none; overflow: hidden;">
+                                <div id="chat-active" class="flex-grow-1 d-flex flex-column d-none" style="overflow: hidden;">
                                     <div class="card-body chat-box scrollable flex-grow-1" id="chat-messages" style="overflow-y: auto;">
                                         <!-- Messages will be loaded here -->
                                     </div>
@@ -115,17 +118,46 @@
                                 </div>
 
                                 <!-- History / Completed Area -->
-                                <div id="chat-history" style="display: none;" class="card-body chat-box scrollable flex-grow-1" style="overflow-y: auto;">
+                                <div id="chat-history" class="card-body chat-box scrollable flex-grow-1 d-none" style="overflow-y: auto;">
                                     <div class="alert alert-info text-center">This consultation has ended.</div>
                                     <div id="history-messages"></div>
                                 </div>
 
                                 <!-- Cancelled Area -->
-                                <div id="chat-cancelled" class="flex-grow-1 d-flex align-items-center justify-content-center flex-column" style="display: none;">
+                                <div id="chat-cancelled" class="flex-grow-1 d-flex align-items-center justify-content-center flex-column d-none">
                                     <div class="text-center">
                                         <i class="fas fa-times-circle fa-5x text-danger mb-4" style="opacity: 0.5;"></i>
                                         <h4 class="font-weight-medium text-dark">Consultation Cancelled</h4>
                                         <div class="text-muted">This consultation request has been cancelled or rejected.</div>
+                                    </div>
+                                </div>
+                                
+                                <div class="modal fade" id="reportModal" tabindex="-1" aria-hidden="true">
+                                    <div class="modal-dialog">
+                                        <div class="modal-content">
+                                            <div class="modal-header">
+                                                <h5 class="modal-title">Consultation Report</h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                            </div>
+                                            <div class="modal-body">
+                                                <div class="mb-3">
+                                                    <label class="form-label">Outcome</label>
+                                                    <textarea class="form-control" id="report_outcome" rows="4"></textarea>
+                                                </div>
+                                                <div class="form-check mb-3">
+                                                    <input class="form-check-input" type="checkbox" id="need_follow_up">
+                                                    <label class="form-check-label" for="need_follow_up">Needs follow-up with homeroom teacher</label>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label class="form-label">Follow-up Notes</label>
+                                                    <textarea class="form-control" id="follow_up_notes" rows="3" placeholder="Details for homeroom teacher"></textarea>
+                                                </div>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                                <button type="button" class="btn btn-primary" onclick="submitConsultReport()">Submit</button>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -155,6 +187,7 @@
     let currentStatus = null;
     let chatInterval = null;
     let timeCheckInterval = null;
+    let hasReport = false;
 
     function loadChat(id, name, date, start, end, status) {
         currentConsultId = id;
@@ -254,37 +287,45 @@
         const historyArea = document.getElementById('chat-history');
         const cancelledArea = document.getElementById('chat-cancelled');
         const btnCancel = document.getElementById('btn-cancel');
-        const btnCancelWait = document.getElementById('btn-cancel-wait');
         const btnEnd = document.getElementById('btn-end');
         const teacherActions = document.getElementById('teacher-actions');
         const isStudent = {{ session('level') }} == 3;
+        const btnReport = document.getElementById('btn-report');
 
-        waitArea.style.display = 'none';
-        activeArea.style.display = 'none';
-        historyArea.style.display = 'none';
-        cancelledArea.style.display = 'none';
+        // Reset all areas using d-none
+        [waitArea, activeArea, historyArea, cancelledArea].forEach(el => {
+            el.classList.remove('d-flex');
+            el.classList.add('d-none');
+        });
+
         if (btnCancel) btnCancel.style.display = 'none';
-        if (btnCancelWait) btnCancelWait.style.display = 'none';
         if (teacherActions) teacherActions.style.display = 'none';
         btnEnd.style.display = 'none';
+        if (btnReport) btnReport.style.display = 'none';
 
         if (status === 'pending') {
-            waitArea.style.display = 'flex';
+            waitArea.classList.remove('d-none');
+            waitArea.classList.add('d-flex');
             if (isStudent) {
                 if (btnCancel) btnCancel.style.display = 'block';
-                if (btnCancelWait) btnCancelWait.style.display = 'block';
             } else {
                 if (teacherActions) teacherActions.style.display = 'block';
             }
         } else if (status === 'active') {
-            activeArea.style.display = 'flex';
+            activeArea.classList.remove('d-none');
+            activeArea.classList.add('d-flex');
             btnEnd.style.display = 'block';
-            if (isStudent && btnCancel) btnCancel.style.display = 'block';
+            // Tombol cancel disembunyikan saat sudah active (mulai chat)
+            if (btnCancel) btnCancel.style.display = 'none'; 
+            if (!isStudent && btnReport && !hasReport) btnReport.style.display = 'inline-block';
         } else if (status === 'completed') {
-            historyArea.style.display = 'flex';
+            historyArea.classList.remove('d-none');
+            historyArea.classList.add('d-flex');
             historyArea.style.flexDirection = 'column';
+            if (!isStudent && btnReport && !hasReport) btnReport.style.display = 'inline-block';
         } else if (status === 'cancelled') {
-            cancelledArea.style.display = 'flex';
+            cancelledArea.classList.remove('d-none');
+            cancelledArea.classList.add('d-flex');
         }
     }
 
@@ -350,6 +391,7 @@
             .then(data => {
                 const messages = data.messages;
                 const status = data.status;
+                hasReport = !!data.has_report;
 
                 // Update current status if changed
                 if (currentStatus !== status) {
@@ -383,6 +425,10 @@
                             consultItem.style.cursor = 'not-allowed';
                             consultItem.removeAttribute('onclick');
                         }
+                    }
+                    const btnReport = document.getElementById('btn-report');
+                    if (btnReport) {
+                        if (status === 'cancelled' || hasReport) btnReport.style.display = 'none';
                     }
                 }
 
@@ -478,6 +524,43 @@
                 location.reload();
             } else {
                 alert('Wait for the other party to also agree to end the conversation.');
+            }
+        });
+    }
+
+    function openReportModal() {
+        const modal = new bootstrap.Modal(document.getElementById('reportModal'));
+        modal.show();
+    }
+
+    function submitConsultReport() {
+        const outcome = document.getElementById('report_outcome').value.trim();
+        const needFollowUp = document.getElementById('need_follow_up').checked;
+        const notes = document.getElementById('follow_up_notes').value.trim();
+        if (!outcome) {
+            alert('Outcome is required');
+            return;
+        }
+        fetch('/chat/report', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+            body: JSON.stringify({
+                consultid: currentConsultId,
+                report_outcome: outcome,
+                need_follow_up: needFollowUp,
+                follow_up_notes: notes
+            })
+        }).then(res => res.json()).then(data => {
+            if (data.success) {
+                hasReport = true;
+                const btnReport = document.getElementById('btn-report');
+                if (btnReport) btnReport.style.display = 'none';
+                const modalEl = document.getElementById('reportModal');
+                const modal = bootstrap.Modal.getInstance(modalEl);
+                modal.hide();
+                alert('Report submitted successfully');
+            } else {
+                alert(data.message || 'Failed to submit report');
             }
         });
     }

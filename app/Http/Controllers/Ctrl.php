@@ -156,9 +156,14 @@ class Ctrl extends Controller
         $system = DB::table('system')->first();
         $level = DB::table('level')->get();
         $role = DB::table('role')->get();
+        $classes = DB::table('class')
+            ->leftJoin('grade', 'grade.gradeid', '=', 'class.gradeid')
+            ->leftJoin('major', 'major.majorid', '=', 'class.majorid')
+            ->select('class.classid', 'class.classname', 'grade.gradename', 'major.majorname')
+            ->get();
         echo view ('all.header',compact('system'));
         echo view ('all.menu', compact('system'));
-        echo view ('admin.userdata',compact('data','level','role'));
+        echo view ('admin.userdata',compact('data','level','role','classes'));
         echo view ('all.footer');
     }
 
@@ -195,10 +200,20 @@ class Ctrl extends Controller
 
        
         if ($request->level == 3) {
+            $rules['classid'] = 'required|exists:class,classid';
+            // Re-validate with class rule when level is student
+            $validator = Validator::make($request->all(), $rules);
+            if ($validator->fails()) {
+                return redirect()->back()
+                    ->withErrors($validator)
+                    ->withInput()
+                    ->with('error', 'Please fix the errors below');
+            }
             DB::table('student')->insert([
                 'name' => $request->name,
                 'email' => $request->email,
                 'phonenumber' => $request->phonenumber,
+                'classid' => $request->classid,
                 'userid' => $userid,
             ]);
         } else if ($request->level == 1){
@@ -400,9 +415,22 @@ class Ctrl extends Controller
 
     public function changepw(Request $request){
         $userid = session('userid');
+        $request->validate([
+            'cp' => 'required',
+            'np' => 'required|min:6',
+            'rp' => 'required'
+        ]);
         $user = DB::table('user')->where('userid', $userid)->first();
         if (!Hash::check($request->cp, $user->password)) {
             return back()->with('error', 'Current password wrong');
+        }
+
+        if ($request->np !== $request->rp) {
+            return back()->with('error', 'New password confirmation does not match');
+        }
+
+        if (Hash::check($request->np, $user->password)) {
+            return back()->with('error', 'New password must be different from current password');
         }
 
         DB::table('user')
@@ -570,6 +598,53 @@ class Ctrl extends Controller
                     ->where('teacherid', $teacherid)
                     ->where('date', $date)
                     ->get();
+            } else {
+                $schedule = DB::table('schedule')
+                    ->where('teacherid', $teacherid)
+                    ->where('day_of_week', $dayOfWeek)
+                    ->where('status', 1)
+                    ->first();
+
+                if ($schedule) {
+                    $startTime = strtotime($schedule->start_time);
+                    $endTime = strtotime($schedule->end_time);
+
+                    $existingMap = [];
+                    foreach ($existingSlots as $slot) {
+                        $existingMap[$slot->start_time . '-' . $slot->end_time] = true;
+                    }
+
+                    $cursor = $startTime;
+                    $inserted = 0;
+                    while ($cursor < $endTime) {
+                        $slotStart = date('H:i:s', $cursor);
+                        $nextSlot = $cursor + 1800;
+                        if ($nextSlot > $endTime) break;
+                        $slotEnd = date('H:i:s', $nextSlot);
+                        $key = $slotStart . '-' . $slotEnd;
+
+                        if (!isset($existingMap[$key])) {
+                            DB::table('time_slots')->insert([
+                                'teacherid' => $teacherid,
+                                'date' => $date,
+                                'start_time' => $slotStart,
+                                'end_time' => $slotEnd,
+                                'is_booked' => 0,
+                                'created_at' => now()
+                            ]);
+                            $inserted++;
+                        }
+
+                        $cursor = $nextSlot;
+                    }
+
+                    if ($inserted > 0) {
+                        $existingSlots = DB::table('time_slots')
+                            ->where('teacherid', $teacherid)
+                            ->where('date', $date)
+                            ->get();
+                    }
+                }
             }
 
             $slots = [];
@@ -577,8 +652,9 @@ class Ctrl extends Controller
             $isToday = ($date == date('Y-m-d'));
 
             foreach ($existingSlots as $slot) {
-                $slotStartTimestamp = strtotime($date . ' ' . $slot->start_time);
-                $isPast = $isToday && ($slotStartTimestamp < $currentTimestamp);
+                // Gunakan format jam yang sama untuk perbandingan (H:i:s)
+                $currentTimeStr = date('H:i:s');
+                $isPast = $isToday && ($slot->start_time < $currentTimeStr);
 
                 $slots[] = [
                     'slotid' => $slot->slotid,
@@ -685,6 +761,22 @@ class Ctrl extends Controller
     }
 
     public function getMessages($id) {
+        $consultInfo = DB::table('consult')
+            ->join('time_slots', 'time_slots.slotid', '=', 'consult.slotid')
+            ->where('consult.consultid', $id)
+            ->select('consult.status', 'time_slots.date', 'time_slots.end_time')
+            ->first();
+
+        if ($consultInfo) {
+            $endDateTime = strtotime($consultInfo->date . ' ' . $consultInfo->end_time);
+            if ($consultInfo->status === 'active' && time() > $endDateTime) {
+                DB::table('consult')->where('consultid', $id)->update([
+                    'status' => 'completed',
+                    'updated_at' => now()
+                ]);
+            }
+        }
+
         $messages = DB::table('consul_message')
             ->join('user', 'user.userid', '=', 'consul_message.userid')
             ->leftJoin('student', 'student.userid', '=', 'user.userid')
@@ -699,11 +791,13 @@ class Ctrl extends Controller
             ->orderBy('consul_message.created_at', 'asc')
             ->get();
 
-        $status = DB::table('consult')->where('consultid', $id)->value('status');
+        $statusData = DB::table('consult')->where('consultid', $id)->select('status', 'report_outcome', 'need_follow_up')->first();
 
         return response()->json([
             'messages' => $messages,
-            'status' => $status
+            'status' => $statusData ? $statusData->status : null,
+            'has_report' => $statusData ? !empty($statusData->report_outcome) : false,
+            'need_follow_up' => $statusData ? (bool)$statusData->need_follow_up : false
         ]);
     }
 
@@ -790,6 +884,106 @@ class Ctrl extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json(['success' => false, 'message' => $e->getMessage()]);
+        }
+    }
+
+    public function submitConsultReport(Request $request) {
+        $userid = session('userid');
+        $level = session('level');
+        if ($level != 2) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+        }
+        $consultid = $request->consultid;
+        $consult = DB::table('consult')
+            ->join('time_slots', 'time_slots.slotid', '=', 'consult.slotid')
+            ->join('student', 'student.studentid', '=', 'consult.studentid')
+            ->where('consult.consultid', $consultid)
+            ->select('consult.*', 'time_slots.teacherid as slot_teacherid', 'student.classid')
+            ->first();
+        if (!$consult) {
+            return response()->json(['success' => false, 'message' => 'Consult not found'], 404);
+        }
+        $teacher = DB::table('teacher')->where('userid', $userid)->first();
+        if (!$teacher || $teacher->teacherid != $consult->slot_teacherid) {
+            return response()->json(['success' => false, 'message' => 'Not your consultation'], 403);
+        }
+        $needFollow = (bool)$request->need_follow_up;
+        $followNotes = $request->follow_up_notes;
+        $reportOutcome = $request->report_outcome;
+        $assignHomeroomId = null;
+        if ($needFollow) {
+            $homeroom = DB::table('homeroomtc')->where('classid', $consult->classid)->first();
+            if ($homeroom) {
+                $assignHomeroomId = $homeroom->teacherid;
+            }
+        }
+        DB::table('consult')->where('consultid', $consultid)->update([
+            'report_outcome' => $reportOutcome,
+            'need_follow_up' => $needFollow,
+            'follow_up_notes' => $followNotes,
+            'follow_up_assigned_teacherid' => $assignHomeroomId,
+            'report_submitted_at' => now(),
+            'updated_at' => now()
+        ]);
+        return response()->json(['success' => true, 'assigned_homeroom_teacherid' => $assignHomeroomId]);
+    }
+
+    public function addTeacher(Request $request) {
+        if (session('level') != 1) {
+            return back()->with('error', 'Unauthorized');
+        }
+        $request->validate([
+            'name' => 'required',
+            'username' => 'required',
+            'email' => 'required|email',
+            'phonenumber' => 'required'
+        ]);
+        DB::beginTransaction();
+        try {
+            $existingUser = DB::table('user')->where('username', $request->username)->first();
+            if ($existingUser) {
+                DB::rollBack();
+                return back()->with('error', 'Username already exists');
+            }
+            $userId = DB::table('user')->insertGetId([
+                'username' => $request->username,
+                'password' => Hash::make($request->username),
+                'levelid' => 2,
+                'verified_at' => now()
+            ]);
+            DB::table('teacher')->insert([
+                'name' => $request->name,
+                'phonenumber' => $request->phonenumber,
+                'email' => $request->email,
+                'roleid' => 3,
+                'userid' => $userId
+            ]);
+            $teacherId = DB::table('teacher')->where('userid', $userId)->value('teacherid');
+            $days = [
+                ['monday', '08:00:00', '15:00:00'],
+                ['tuesday', '08:00:00', '15:00:00'],
+                ['wednesday', '08:00:00', '15:00:00'],
+                ['thursday', '08:00:00', '15:00:00'],
+                ['friday', '08:00:00', '15:00:00'],
+                ['saturday', '08:00:00', '12:00:00'],
+                ['sunday', '08:00:00', '12:00:00']
+            ];
+            foreach ($days as $d) {
+                DB::table('schedule')->insert([
+                    'teacherid' => $teacherId,
+                    'day_of_week' => $d[0],
+                    'start_time' => $d[1],
+                    'end_time' => $d[2],
+                    'status' => 1,
+                    'created_at' => now(),
+                    'updated_at' => now()
+                ]);
+            }
+            DB::commit();
+            return back()->with('success', 'Teacher added successfully with default schedule');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', $e->getMessage());
         }
     }
 

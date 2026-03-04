@@ -27,6 +27,11 @@
                 <!-- Row -->
                 <div class="row">
                     <div class="col-12">
+                        @if(session('level') == 1)
+                        <div class="d-flex justify-content-end mb-3">
+                            <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addTeacherModal">Add Teacher</button>
+                        </div>
+                        @endif
                         <div class="row">
                         <?php foreach($data as $key) { ?>
                             <div class="col-lg-3 col-md-6">
@@ -59,13 +64,40 @@
                                                         }
                                                     }
 
-                                                    // Tampilkan Weekdays
+                                                    $allWeekdays = ['monday','tuesday','wednesday','thursday','friday'];
+                                                    $weekdayTotal = 0;
+                                                    $maxCount = 0;
+                                                    $maxTime = null;
                                                     foreach ($weekdaySchedules as $time => $days) {
-                                                        $dayLabel = (count($days) >= 5) ? 'Monday - Friday' : implode(', ', array_map('ucfirst', $days));
+                                                        $weekdayTotal += count($days);
+                                                        if (count($days) > $maxCount) {
+                                                            $maxCount = count($days);
+                                                            $maxTime = $time;
+                                                        }
+                                                    }
+                                                    if ($weekdayTotal === 5 && $maxCount >= 4 && $maxTime) {
                                                         echo '<div class="d-flex justify-content-between small">
-                                                                <span>'.$dayLabel.'</span>
-                                                                <span class="text-dark font-weight-medium">'.$time.'</span>
+                                                                <span>Monday - Friday</span>
+                                                                <span class="text-dark font-weight-medium">'.$maxTime.'</span>
                                                               </div>';
+                                                        foreach ($weekdaySchedules as $time => $days) {
+                                                            if ($time !== $maxTime) {
+                                                                foreach ($days as $d) {
+                                                                    echo '<div class="d-flex justify-content-between small">
+                                                                            <span>'.ucfirst($d).'</span>
+                                                                            <span class="text-dark font-weight-medium">'.$time.'</span>
+                                                                          </div>';
+                                                                }
+                                                            }
+                                                        }
+                                                    } else {
+                                                        foreach ($weekdaySchedules as $time => $days) {
+                                                            $dayLabel = (count($days) >= 5) ? 'Monday - Friday' : implode(', ', array_map('ucfirst', $days));
+                                                            echo '<div class="d-flex justify-content-between small">
+                                                                    <span>'.$dayLabel.'</span>
+                                                                    <span class="text-dark font-weight-medium">'.$time.'</span>
+                                                                  </div>';
+                                                        }
                                                     }
 
                                                     // Tampilkan Weekends
@@ -144,6 +176,46 @@
         </div><!-- /.modal-content -->
     </div><!-- /.modal-dialog -->
 </div>
+
+@if(session('level') == 1)
+<div class="modal fade" id="addTeacherModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add Teacher</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="/teacher/add" method="post">
+                @csrf
+                <div class="modal-body">
+                    <div class="form-group mb-3">
+                        <label>Name</label>
+                        <input type="text" class="form-control" name="name" required>
+                    </div>
+                    <div class="form-group mb-3">
+                        <label>Username</label>
+                        <input type="text" class="form-control" name="username" required>
+                    </div>
+                    <div class="form-group mb-3">
+                        <label>Email</label>
+                        <input type="email" class="form-control" name="email" required>
+                    </div>
+                    <div class="form-group mb-3">
+                        <label>Phonenumber</label>
+                        <input type="text" class="form-control" name="phonenumber" required>
+                    </div>
+                    <div class="small text-muted">
+                        Default schedule will be created: Mon–Fri 08:00–15:00, Sat–Sun 08:00–12:00.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-primary">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+@endif
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {

@@ -141,6 +141,21 @@
                     <div class="invalid-feedback">{{ $message }}</div>
                 @enderror
                 
+                <div id="classWrapper" style="margin-top: 10px; display: none;">
+                    <label>Class</label>
+                    <select name="classid" id="classSelect" class="form-control @error('classid') is-invalid @enderror">
+                        <option value="" disabled selected>Choose Class</option>
+                        <?php foreach ($classes as $c) { ?>
+                            <option value="<?= $c->classid ?>" {{ old('classid') == $c->classid ? 'selected' : '' }}>
+                                <?= $c->gradename . ' ' . $c->classname . ' (' . ($c->majorname ?? 'No Major') . ')' ?>
+                            </option>
+                        <?php } ?>
+                    </select>
+                    @error('classid')
+                        <div class="invalid-feedback">{{ $message }}</div>
+                    @enderror
+                </div>
+
                 <label>Role</label>
                 <select name="role" id="roleSelect" class="form-control @error('role') is-invalid @enderror" {{ old('level') == 3 ? 'disabled' : '' }}>
                     <option value="" disabled selected>Choose Role</option>
@@ -165,6 +180,7 @@
 <script>
     const levelSelect = document.getElementById('levelSelect');
     const roleSelect = document.getElementById('roleSelect');
+    const classWrapper = document.getElementById('classWrapper');
 
     function updateRoleOptions() {
         const level = levelSelect.value;
@@ -179,19 +195,22 @@
             // disable role 3 & 4
             disableRole([3,4]);
             roleSelect.disabled = false;
+            if (classWrapper) classWrapper.style.display = 'none';
         } 
         else if (level == 2) {
             // disable role 1 & 2
             disableRole([1,2]);
             roleSelect.disabled = false;
+            if (classWrapper) classWrapper.style.display = 'none';
         } 
         else if (level == 3) {
-            // disable semua role
             roleSelect.disabled = true;
             roleSelect.value = "";
+            if (classWrapper) classWrapper.style.display = 'block';
         } 
         else {
             roleSelect.disabled = false;
+            if (classWrapper) classWrapper.style.display = 'none';
         }
     }
 
@@ -214,6 +233,9 @@
     // jalan saat pertama load (old value)
     document.addEventListener('DOMContentLoaded', function() {
         updateRoleOptions();
+        if (levelSelect.value == 3 && classWrapper) {
+            classWrapper.style.display = 'block';
+        }
     });
 
     // Auto open modal if validation error

@@ -18,9 +18,11 @@ Route::post('/userdata/reset/{id}', 'App\Http\Controllers\Ctrl@userresetpassword
 Route::get('/teacherlist', 'App\Http\Controllers\Ctrl@teacherlist');
 Route::get('/get-available-times', 'App\Http\Controllers\Ctrl@getAvailableTimes');
 Route::post('/book-consult', 'App\Http\Controllers\Ctrl@bookConsult');
+Route::post('/teacher/add', 'App\Http\Controllers\Ctrl@addTeacher');
 
 Route::get('/myprofile', 'App\Http\Controllers\Ctrl@profile');
 Route::post('/myprofile/update', 'App\Http\Controllers\Ctrl@updateprofile');
+Route::post('/myprofile/changepw', 'App\Http\Controllers\Ctrl@changepw');
 
 Route::get('/setting', 'App\Http\Controllers\Ctrl@setting');
 Route::post('/setting/update', 'App\Http\Controllers\Ctrl@savesetting');
@@ -36,3 +38,4 @@ Route::post('/chat/end', 'App\Http\Controllers\Ctrl@endConsultation');
 Route::post('/chat/cancel', 'App\Http\Controllers\Ctrl@cancelConsultation');
 Route::post('/chat/approve', 'App\Http\Controllers\Ctrl@approveConsultation');
 Route::post('/chat/reject', 'App\Http\Controllers\Ctrl@rejectConsultation');
+Route::post('/chat/report', 'App\Http\Controllers\Ctrl@submitConsultReport');
