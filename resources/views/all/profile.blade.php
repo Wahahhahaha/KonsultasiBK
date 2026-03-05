@@ -35,12 +35,15 @@
                                                 <label>ID Number</label>
                                                 <input type="text" class="form-control" value="<?=$data->username ?>" disabled>
                                             </div>
+<<<<<<< HEAD
                                             @if($data->levelid == 3)
                                             <div class="form-group mb-3">
                                                 <label>Class</label>
                                                 <input type="text" class="form-control" value="<?=$data->gradename ?> <?=$data->classname?> <?=$data->majorname?>" disabled>
                                             </div>
                                             @endif
+=======
+>>>>>>> b7901593b3017170e4c24a8a370bd99885522be3
                                             <div class="form-group mb-3">
                                                 <label>Name</label>
                                                 <input type="text" class="form-control" value="<?=$data->name ?>" name="name">

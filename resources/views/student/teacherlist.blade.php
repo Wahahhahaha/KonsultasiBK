@@ -286,7 +286,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
                 
                 bookingTime.disabled = false;
+<<<<<<< HEAD
                 timeHelp.textContent = 'Each session lasts for 30 minutes.';
+=======
+                timeHelp.textContent = 'Each session lasts for 1 hour.';
+>>>>>>> b7901593b3017170e4c24a8a370bd99885522be3
             })
             .catch(error => {
                 console.error('Error fetching times:', error);

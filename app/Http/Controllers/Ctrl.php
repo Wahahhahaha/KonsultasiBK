@@ -364,18 +364,24 @@ class Ctrl extends Controller
             ->leftJoin('student', 'student.userid', '=', 'user.userid')
             ->leftJoin('employer', 'employer.userid', '=', 'user.userid')
             ->leftJoin('teacher', 'teacher.userid', '=', 'user.userid')
+<<<<<<< HEAD
             ->leftJoin('class', 'class.classid', '=', 'student.studentid')
             ->leftJoin('major', 'major.majorid', '=', 'class.classid')
             ->leftJoin('grade', 'grade.gradeid', '=', 'class.classid')
             ->leftJoin('level', 'level.levelid', '=', 'user.levelid')
+=======
+>>>>>>> b7901593b3017170e4c24a8a370bd99885522be3
 
             ->select(
                 'user.userid',
                 'user.username',
+<<<<<<< HEAD
                 'class.classname',
                 'major.majorname',
                 'grade.gradename',
                 'level.levelid',
+=======
+>>>>>>> b7901593b3017170e4c24a8a370bd99885522be3
 
                 DB::raw('COALESCE(student.email, employer.email,teacher.email) as email'),
                 DB::raw('COALESCE(student.phonenumber, employer.phonenumber,teacher.phonenumber) as phonenumber'),
