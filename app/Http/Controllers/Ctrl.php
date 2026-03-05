@@ -987,4 +987,43 @@ class Ctrl extends Controller
         }
     }
 
+    public function followups(Request $request) {
+        $system = DB::table('system')->first();
+        $userid = session('userid');
+        $teacher = DB::table('teacher')->where('userid', $userid)->first();
+        if (!$teacher) {
+            return redirect('/home');
+        }
+        $items = DB::table('consult')
+            ->join('student', 'student.studentid', '=', 'consult.studentid')
+            ->leftJoin('time_slots', 'time_slots.slotid', '=', 'consult.slotid')
+            ->leftJoin('teacher as counselor', 'counselor.teacherid', '=', 'time_slots.teacherid')
+            ->leftJoin('class', 'class.classid', '=', 'student.classid')
+            ->leftJoin('grade', 'grade.gradeid', '=', 'class.gradeid')
+            ->leftJoin('major', 'major.majorid', '=', 'class.majorid')
+            ->where('consult.need_follow_up', 1)
+            ->where('consult.follow_up_assigned_teacherid', $teacher->teacherid)
+            ->select(
+                'consult.consultid',
+                'consult.report_outcome',
+                'consult.follow_up_notes',
+                'consult.report_submitted_at',
+                'student.name as student_name',
+                'student.phonenumber as student_phone',
+                'grade.gradename',
+                'class.classname',
+                'major.majorname',
+                'counselor.name as counselor_name',
+                'time_slots.date',
+                'time_slots.start_time',
+                'time_slots.end_time'
+            )
+            ->orderBy('consult.report_submitted_at', 'desc')
+            ->get();
+        echo view('all.header', compact('system'));
+        echo view('all.menu', compact('system'));
+        echo view('teacher.followups', compact('items'));
+        echo view('all.footer');
+    }
+
 }

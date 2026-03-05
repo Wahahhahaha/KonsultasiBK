@@ -122,6 +122,12 @@
                     class="svg-icon me-2 ms-1"></i>
                 My Profile</a>
                 <div class="dropdown-divider"></div>
+                @if(session('level') == 2)
+                <a class="dropdown-item" href="/followups"><i data-feather="clipboard"
+                    class="svg-icon me-2 ms-1"></i>
+                Follow-ups</a>
+                <div class="dropdown-divider"></div>
+                @endif
                 <a class="dropdown-item" href="javascript:void(0)"><i data-feather="settings"
                     class="svg-icon me-2 ms-1"></i>
                 Account Setting</a>
@@ -164,6 +170,13 @@
                         class="hide-menu">Teacher List
                     </span></a>
                 </li>
+                @if(session('level') == 2)
+                <li class="sidebar-item"> <a class="sidebar-link" href="/followups"
+                    aria-expanded="false"><i data-feather="clipboard" class="feather-icon"></i><span
+                    class="hide-menu">Follow-ups
+                </span></a>
+                </li>
+                @endif
                 <li class="sidebar-item"> <a class="sidebar-link sidebar-link" href="/chat"
                     aria-expanded="false"><i data-feather="message-square" class="feather-icon"></i><span
                     class="hide-menu">Chat</span></a></li>

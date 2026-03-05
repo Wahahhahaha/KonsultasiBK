@@ -39,3 +39,4 @@ Route::post('/chat/cancel', 'App\Http\Controllers\Ctrl@cancelConsultation');
 Route::post('/chat/approve', 'App\Http\Controllers\Ctrl@approveConsultation');
 Route::post('/chat/reject', 'App\Http\Controllers\Ctrl@rejectConsultation');
 Route::post('/chat/report', 'App\Http\Controllers\Ctrl@submitConsultReport');
+Route::get('/followups', 'App\Http\Controllers\Ctrl@followups');
