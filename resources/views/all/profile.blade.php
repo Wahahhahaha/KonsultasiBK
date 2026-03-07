@@ -35,15 +35,14 @@
                                                 <label>ID Number</label>
                                                 <input type="text" class="form-control" value="<?=$data->username ?>" disabled>
                                             </div>
-<<<<<<< HEAD
+
                                             @if($data->levelid == 3)
                                             <div class="form-group mb-3">
                                                 <label>Class</label>
                                                 <input type="text" class="form-control" value="<?=$data->gradename ?> <?=$data->classname?> <?=$data->majorname?>" disabled>
                                             </div>
                                             @endif
-=======
->>>>>>> b7901593b3017170e4c24a8a370bd99885522be3
+
                                             <div class="form-group mb-3">
                                                 <label>Name</label>
                                                 <input type="text" class="form-control" value="<?=$data->name ?>" name="name">
@@ -54,7 +53,7 @@
                                             </div>
                                             <div class="form-group mb-3">
                                                 <label>Phonenumber</label>
-                                                <input type="text" class="form-control" value="<?=$data->phonenumber ?>" name="phone">
+                                                <input type="text" class="form-control" value="<?=$data->phonenumber ?>" disabled>
                                             </div>
                                             <div class="form-group mb-3">
                                                 <button type="submit" class="btn btn-dark w-100">Save Profile</button>
@@ -96,6 +95,26 @@
                                         </form>
                                     </div>
                                 </div>
+                                <div class="card mt-3">
+                                    <div class="card-body">
+                                        <h4 class="card-title">Change Phone (WhatsApp OTP)</h4>
+                                        <div class="form-group mb-3">
+                                            <label>New Phone (WhatsApp)</label>
+                                            <input type="text" class="form-control" id="new_phone" placeholder="08xxxx">
+                                        </div>
+                                        <div class="form-group mb-3">
+                                            <button class="btn btn-dark w-100" type="button" onclick="requestPhoneOtp()">Send OTP via WhatsApp</button>
+                                        </div>
+                                        <div class="form-group mb-3">
+                                            <label>Enter OTP</label>
+                                            <input type="text" class="form-control" id="phone_otp" placeholder="6-digit OTP">
+                                        </div>
+                                        <div class="form-group mb-3">
+                                            <button class="btn btn-primary w-100" type="button" onclick="confirmPhoneOtp()">Confirm & Update Phone</button>
+                                        </div>
+                                        <div id="phone-otp-status" class="small text-muted"></div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
             </div>
@@ -122,4 +141,33 @@ document.querySelectorAll('.toggle-password').forEach(function(btn){
         }
     });
 });
+
+function requestPhoneOtp() {
+    const phone = document.getElementById('new_phone').value.trim();
+    const statusEl = document.getElementById('phone-otp-status');
+    if (!phone) { statusEl.textContent = 'Please enter new phone number.'; return; }
+    fetch('/myprofile/request-phone-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+        body: JSON.stringify({ new_phone: phone })
+    }).then(res => res.json()).then(data => {
+        statusEl.textContent = data.message || (data.success ? 'OTP sent' : 'Failed to send OTP');
+    });
+}
+
+function confirmPhoneOtp() {
+    const otp = document.getElementById('phone_otp').value.trim();
+    const statusEl = document.getElementById('phone-otp-status');
+    if (!otp) { statusEl.textContent = 'Please enter OTP.'; return; }
+    fetch('/myprofile/confirm-phone-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+        body: JSON.stringify({ otp })
+    }).then(res => res.json()).then(data => {
+        statusEl.textContent = data.message || (data.success ? 'Phone updated' : 'Failed to update phone');
+        if (data.success) {
+            location.reload();
+        }
+    });
+}
 </script>

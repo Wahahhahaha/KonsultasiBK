@@ -47,7 +47,11 @@
                     </div>
                 @endif
                 
-                <button type="button" class="btn btn-rounded btn-info" data-bs-toggle="modal"data-bs-target="#addUser">Add User</button>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-rounded btn-info" data-bs-toggle="modal"data-bs-target="#addUser">Add User</button>
+                    <a href="/userdata/export" class="btn btn-rounded btn-success">Export</a>
+                    <button type="button" class="btn btn-rounded btn-primary" data-bs-toggle="modal" data-bs-target="#importUser">Import</button>
+                </div>
                 <br><br>
                 <div class="row">
                     <div class="col-12">
@@ -72,7 +76,11 @@
                                             <tr>
                                                 <?php foreach ($data as $key) { ?>
                                                 <td><?= $key->username ?></td>
-                                                <td><?= $key->name ?></td>
+                                                <td><?= $key->name ?> 
+                                                <?php if($key->levelid == 3) { ?>
+                                                <?=$key->majorname?> <?=$key->gradename ?>-<?=$key->classname?>
+                                                <?php } ?>
+                                                </td>
                                                 <td><?= $key->email ?></td>
                                                 <td><?= $key->phonenumber ?></td>
                                                 <td><?= $key->levelname ?></td>
@@ -175,6 +183,32 @@
         </form>
         </div><!-- /.modal-content -->
     </div><!-- /.modal-dialog -->
+</div>
+
+<div class="modal fade" id="importUser" tabindex="-1" role="dialog" aria-labelledby="importUserTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="importUserTitle">Import Users</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="/userdata/import" method="post" enctype="multipart/form-data">
+                @csrf
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">File (CSV, Excel .xls, atau .xlsx)</label>
+                        <input type="file" name="file" class="form-control" accept=".csv,.xls,.xlsx" required>
+                        <div class="small text-muted mt-2">
+                            Kolom: userid(optional), username, name, password(optional), email, phonenumber, level, role(optional), class(optional), grade(optional), major(optional).
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-primary">Import</button>
+                </div>
+            </form>
+        </div>
+    </div>
 </div>
 
 <script>

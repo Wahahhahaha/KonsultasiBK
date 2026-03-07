@@ -41,68 +41,46 @@
                                 id="bell" role="button" data-bs-toggle="dropdown" aria-haspopup="true"
                                 aria-expanded="false">
                                 <span><i data-feather="bell" class="svg-icon"></i></span>
-                                <span class="badge text-bg-primary notify-no rounded-circle">5</span>
+                                <?php
+                                    $notifCount = 0;
+                                    try {
+                                        $uid = session('userid');
+                                        if ($uid) {
+                                            $notifCount = DB::table('notifications')->where('userid',$uid)->where('is_read',0)->count();
+                                        }
+                                    } catch (\Exception $e) {}
+                                ?>
+                                <span class="badge text-bg-primary notify-no rounded-circle">{{ $notifCount }}</span>
                             </a>
-                            <div class="dropdown-menu dropdown-menu-left mailbox animated bounceInDown">
+                            <div class="dropdown-menu dropdown-menu-end dropdown-menu-right mailbox animated bounceInDown">
                                 <ul class="list-style-none">
                                     <li>
                                         <div class="message-center notifications position-relative">
-                                            <!-- Message -->
-                                            <a href="javascript:void(0)"
-                                            class="message-item d-flex align-items-center border-bottom px-3 py-2">
-                                            <div class="btn btn-danger rounded-circle btn-circle"><i
-                                                data-feather="airplay" class="text-white"></i></div>
-                                                <div class="w-75 d-inline-block v-middle ps-2">
-                                                    <h6 class="message-title mb-0 mt-1">Luanch Admin</h6>
-                                                    <span class="font-12 text-nowrap d-block text-muted">Just see
-                                                        the my new
-                                                    admin!</span>
-                                                    <span class="font-12 text-nowrap d-block text-muted">9:30 AM</span>
-                                                </div>
-                                            </a>
-                                            <!-- Message -->
-                                            <a href="javascript:void(0)"
-                                            class="message-item d-flex align-items-center border-bottom px-3 py-2">
-                                            <span class="btn btn-success text-white rounded-circle btn-circle"><i
-                                                data-feather="calendar" class="text-white"></i></span>
-                                                <div class="w-75 d-inline-block v-middle ps-2">
-                                                    <h6 class="message-title mb-0 mt-1">Event today</h6>
-                                                    <span
-                                                    class="font-12 text-nowrap d-block text-muted text-truncate">Just
-                                                a reminder that you have event</span>
-                                                <span class="font-12 text-nowrap d-block text-muted">9:10 AM</span>
-                                            </div>
-                                        </a>
-                                        <!-- Message -->
-                                        <a href="javascript:void(0)"
-                                        class="message-item d-flex align-items-center border-bottom px-3 py-2">
-                                        <span class="btn btn-info rounded-circle btn-circle"><i
-                                            data-feather="settings" class="text-white"></i></span>
-                                            <div class="w-75 d-inline-block v-middle ps-2">
-                                                <h6 class="message-title mb-0 mt-1">Settings</h6>
-                                                <span
-                                                class="font-12 text-nowrap d-block text-muted text-truncate">You
-                                                can customize this template
-                                            as you want</span>
-                                            <span class="font-12 text-nowrap d-block text-muted">9:08 AM</span>
+                                            <?php
+                                                $rows = [];
+                                                try {
+                                                    $uid = session('userid');
+                                                    if ($uid) {
+                                                        $rows = DB::table('notifications')->where('userid',$uid)->orderBy('created_at','desc')->limit(10)->get();
+                                                    }
+                                                } catch (\Exception $e) {}
+                                            ?>
+                                            @forelse($rows as $n)
+                                                <a href="javascript:void(0)" class="message-item d-flex align-items-center border-bottom px-3 py-2">
+                                                    <div class="btn btn-success rounded-circle btn-circle"><i data-feather="bell" class="text-white"></i></div>
+                                                    <div class="w-75 d-inline-block v-middle ps-2">
+                                                        <h6 class="message-title mb-0 mt-1">{{ $n->title }}</h6>
+                                                        <span class="font-12 text-nowrap d-block text-muted text-truncate">{{ $n->body }}</span>
+                                                        <span class="font-12 text-nowrap d-block text-muted">{{ date('d M Y H:i', strtotime($n->created_at)) }}</span>
+                                                    </div>
+                                                </a>
+                                            @empty
+                                                <div class="px-3 py-2 text-muted">No notifications</div>
+                                            @endforelse
                                         </div>
-                                    </a>
-                                    <!-- Message -->
-                                    <a href="javascript:void(0)"
-                                    class="message-item d-flex align-items-center border-bottom px-3 py-2">
-                                    <span class="btn btn-primary rounded-circle btn-circle"><i
-                                        data-feather="box" class="text-white"></i></span>
-                                        <div class="w-75 d-inline-block v-middle ps-2">
-                                            <h6 class="message-title mb-0 mt-1">Pavan kumar</h6> <span
-                                            class="font-12 text-nowrap d-block text-muted">Just
-                                        see the my admin!</span>
-                                        <span class="font-12 text-nowrap d-block text-muted">9:02 AM</span>
-                                    </div>
-                                </a>
-                            </div>
                         </li>
                         <li>
-                            <a class="nav-link pt-3 text-center text-dark" href="javascript:void(0);">
+                            <a class="nav-link pt-3 text-center text-dark" href="/notifications">
                                 <strong>Check all notifications</strong>
                                 <i class="fa fa-angle-right"></i>
                             </a>
@@ -126,18 +104,11 @@
                 <a class="dropdown-item" href="/followups"><i data-feather="clipboard"
                     class="svg-icon me-2 ms-1"></i>
                 Follow-ups</a>
-                <div class="dropdown-divider"></div>
                 @endif
-                <a class="dropdown-item" href="javascript:void(0)"><i data-feather="settings"
-                    class="svg-icon me-2 ms-1"></i>
-                Account Setting</a>
                 <div class="dropdown-divider"></div>
                 <a class="dropdown-item" href="/logout"><i data-feather="power"
                     class="svg-icon me-2 ms-1"></i>
                 Logout</a>
-                <div class="dropdown-divider"></div>
-                <div class="pl-4 p-3"><a href="javascript:void(0)" class="btn btn-sm btn-info">View
-                Profile</a></div>
             </div>
         </li>
         <!-- ============================================================== -->
@@ -158,78 +129,147 @@
     <div class="scroll-sidebar" data-sidebarbg="skin6">
         <!-- Sidebar navigation-->
         <nav class="sidebar-nav">
+            <?php
+                $isLogin = session('is_login') === true;
+                $level = session('level');
+                $roleName = strtolower(str_replace(' ', '_', session('role') ?? ''));
+                if (!$isLogin) {
+                    $subject = 'guest';
+                } else if ($level == 1) {
+                    $subject = in_array($roleName, ['superadmin','admin']) ? $roleName : 'admin';
+                } else if ($level == 2) {
+                    $subject = in_array($roleName, ['counselling_teacher','homeroom_teacher']) ? $roleName : 'counselling_teacher';
+                } else if ($level == 3) {
+                    $subject = 'student';
+                } else {
+                    $subject = 'guest';
+                }
+                $allowed = [];
+                try {
+                    $allowed = collect(DB::table('menu_permissions')->where('subject',$subject)->where('allowed',1)->pluck('menu_key'))->all();
+                } catch (\Exception $e) {
+                    $allowed = [];
+                }
+                $can = function($key) use ($isLogin, $allowed) {
+                    if (!$isLogin) {
+                        return in_array($key, ['dashboard','login']);
+                    }
+                    if (in_array($key, ['dashboard'])) return true;
+                    return empty($allowed) ? true : in_array($key, $allowed);
+                };
+            ?>
             <ul id="sidebarnav">
                 <li class="sidebar-item"> <a class="sidebar-link sidebar-link" href="/home"
                     aria-expanded="false"><i data-feather="home" class="feather-icon"></i><span
                     class="hide-menu">Dashboard</span></a></li>
-                    <li class="list-divider"></li>
-                    <li class="nav-small-cap"><span class="hide-menu">Applications</span></li>
 
+                    <?php if(!$can('login')) { ?>
+                    <li class="list-divider"></li>
+                <?php } ?>
+                    
+                    <?php if($can('teacherlist')) { ?>
                     <li class="sidebar-item"> <a class="sidebar-link" href="/teacherlist"
                         aria-expanded="false"><i data-feather="list" class="feather-icon"></i><span
                         class="hide-menu">Teacher List
                     </span></a>
                 </li>
+                <?php } ?>
                 @if(session('level') == 2)
+                <?php if($can('followups')) { ?>
                 <li class="sidebar-item"> <a class="sidebar-link" href="/followups"
                     aria-expanded="false"><i data-feather="clipboard" class="feather-icon"></i><span
                     class="hide-menu">Follow-ups
                 </span></a>
                 </li>
+                <?php } ?>
                 @endif
+                <?php if($can('chat')) { ?>
                 <li class="sidebar-item"> <a class="sidebar-link sidebar-link" href="/chat"
                     aria-expanded="false"><i data-feather="message-square" class="feather-icon"></i><span
                     class="hide-menu">Chat</span></a></li>
-                    <li class="sidebar-item"> <a class="sidebar-link sidebar-link" href="app-calendar.html"
-                        aria-expanded="false"><i data-feather="calendar" class="feather-icon"></i><span
-                        class="hide-menu">Calendar</span></a></li>
+                <?php } ?>
 
-                        <li class="sidebar-item">
-                            <a class="sidebar-link sidebar-link" href="/userdata" aria-expanded="false">
-                                <i data-feather="calendar" class="feather-icon"></i>
-                                <span class="hide-menu">User data</span>
-                            </a>
-                        </li>
+         <?php if($can('notifications')) { ?>
+                <li class="sidebar-item"> <a class="sidebar-link" href="/notifications"
+                    aria-expanded="false"><i data-feather="bell" class="feather-icon"></i><span
+                    class="hide-menu">Notifications
+                </span></a>
+            </li>
+            <?php } ?>
 
-                        <li class="list-divider"></li>
+                <?php if($can('classdata') || $can('gradedata') || $can('majordata')) { ?>
+                <li class="sidebar-item"> <a class="sidebar-link has-arrow" href="javascript:void(0)"
+                    aria-expanded="false"><i data-feather="grid" class="feather-icon"></i><span
+                    class="hide-menu">Manage Data</span></a>
+                    <ul aria-expanded="false" class="collapse  first-level base-level-line">
+                        <?php if($can('classdata')) { ?><li class="sidebar-item"><a href="/classdata" class="sidebar-link"><span
+                            class="hide-menu"> Class Data
+                        </span></a>
+                        </li><?php } ?>
+                        <?php if($can('gradedata')) { ?><li class="sidebar-item"><a href="/gradedata" class="sidebar-link"><span
+                            class="hide-menu"> Grade Data
+                        </span></a>
+                        </li><?php } ?>
+                        <?php if($can('majordata')) { ?><li class="sidebar-item"><a href="/majordata" class="sidebar-link"><span
+                            class="hide-menu"> Major Data
+                        </span></a>
+                        </li><?php } ?>
+                    </ul>
+                </li>
+                <?php } ?>
 
-                        <li class="sidebar-item"> <a class="sidebar-link sidebar-link" href="/database"
-                            aria-expanded="false"><i data-feather="layers" class="feather-icon"></i><span
+                <?php if($can('userdata')) { ?>
+                <li class="sidebar-item"> <a class="sidebar-link sidebar-link" href="/userdata"
+                    aria-expanded="false"><i data-feather="users" class="feather-icon"></i><span
+                    class="hide-menu">User data</span></a></li>
+                <?php } ?>
+
+            <?php if(!$can('login')) { ?>
+                <li class="list-divider"></li>
+            <?php } ?>
+
+                        <?php if($can('activity_logs')) { ?><li class="sidebar-item"> <a class="sidebar-link sidebar-link" href="/activity-logs"
+                            aria-expanded="false"><i data-feather="bar-chart-2" class="feather-icon"></i><span
                             class="hide-menu">Activity Logs
                         </span></a>
-                    </li>
+                    </li><?php } ?>
 
-                    <li class="sidebar-item"> <a class="sidebar-link sidebar-link" href="/database"
-                        aria-expanded="false"><i data-feather="layers" class="feather-icon"></i><span
+                    <?php if($can('database')) { ?><li class="sidebar-item"> <a class="sidebar-link sidebar-link" href="/trash"
+                        aria-expanded="false"><i data-feather="trash-2" class="feather-icon"></i><span
                         class="hide-menu">Trash Can
                     </span></a>
-                </li>
+                </li><?php } ?>
 
-                <li class="sidebar-item"> <a class="sidebar-link sidebar-link" href="/database"
+                <?php if($can('database')) { ?><li class="sidebar-item"> <a class="sidebar-link sidebar-link" href="/database"
                     aria-expanded="false"><i data-feather="layers" class="feather-icon"></i><span
                     class="hide-menu">Database
                 </span></a>
-            </li>
+            </li><?php } ?>
 
-            <li class="sidebar-item"> <a class="sidebar-link sidebar-link" href="/setting"
-                aria-expanded="false"><i data-feather="settings" class="feather-icon"></i><span
+            <?php if($can('permission')) { ?>
+            <li class="sidebar-item"> <a class="sidebar-link sidebar-link" href="/permission"
+                aria-expanded="false"><i data-feather="shield" class="feather-icon"></i><span
                 class="hide-menu">Permission
             </span></a>
         </li>
+        <?php } ?>
 
+        <?php if($can('setting')) { ?>
         <li class="sidebar-item"> <a class="sidebar-link sidebar-link" href="/setting"
             aria-expanded="false"><i data-feather="settings" class="feather-icon"></i><span
             class="hide-menu">Setting
         </span></a>
     </li>
+    <?php } ?>
     <li class="list-divider"></li>
-    <li class="nav-small-cap"><span class="hide-menu">Authentication</span></li>
 
+    <?php if($can('login')) { ?>
     <li class="sidebar-item"> <a class="sidebar-link sidebar-link" href="/login"
         aria-expanded="false"><i data-feather="lock" class="feather-icon"></i><span
         class="hide-menu">Login
     </span></a>
 </li>
+<?php } ?>
 </ul>
 </nav>
 <!-- End Sidebar navigation -->
