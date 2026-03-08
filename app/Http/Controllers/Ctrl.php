@@ -324,6 +324,7 @@ class Ctrl extends Controller
         $countStudents = DB::table('student')->count();
         $countTeachers = DB::table('teacher')->count();
         $countConsults = DB::table('consult')->whereIn('status',['active','completed'])->count();
+        $this->cancelExpiredConsultations();
         $teachers = DB::table('teacher')
             ->leftJoin('homeroomtc', 'homeroomtc.teacherid', '=', 'teacher.teacherid')
             ->leftJoin('counceltc', 'counceltc.teacherid', '=', 'teacher.teacherid')
@@ -338,9 +339,19 @@ class Ctrl extends Controller
                 ->where('status', 1)
                 ->get();
         }
+        $hasActiveBooking = false;
+        if (session('level') == 3) {
+            $stu = DB::table('student')->where('userid', session('userid'))->first();
+            if ($stu) {
+                $hasActiveBooking = DB::table('consult')
+                    ->where('studentid', $stu->studentid)
+                    ->whereIn('status', ['pending','active'])
+                    ->exists();
+            }
+        }
         echo view ('all.header',compact('system'));
         echo view ('all.menu', compact('system'));
-        echo view ('all.home',compact('system','countUsers','countStudents','countTeachers','countConsults','teachers'));
+        echo view ('all.home',compact('system','countUsers','countStudents','countTeachers','countConsults','teachers','hasActiveBooking'));
         echo view ('all.footer');
     }
 
@@ -2267,19 +2278,91 @@ class Ctrl extends Controller
                 'grade.gradename',
                 'level.levelid',
 
-
                 DB::raw('COALESCE(student.email, employer.email,teacher.email) as email'),
                 DB::raw('COALESCE(student.phonenumber, employer.phonenumber,teacher.phonenumber) as phonenumber'),
                 DB::raw('COALESCE(student.name, employer.name,teacher.name) as name'),
+                DB::raw('teacher.roleid as teacher_roleid')
             )
             ->where('user.userid', $userid)
             ->first();
 
         echo view ('all.header',compact('system'));
-        echo view ('all.menu',compact('system'));  
-        echo view('all.profile', compact('data'));
+        echo view ('all.menu',compact('system'));
+        $teacher = DB::table('teacher')->where('userid',$userid)->first();
+        $schedules = [];
+        if ($teacher) {
+            $rows = DB::table('schedule')->where('teacherid',$teacher->teacherid)->where('status',1)->get();
+            foreach ($rows as $r) {
+                $schedules[strtolower($r->day_of_week)] = ['start'=>$r->start_time,'end'=>$r->end_time];
+            }
+        }
+        echo view('all.profile', ['data'=>$data, 'teacherSchedules'=>$schedules]);
         echo view('all.footer');
 
+    }
+    public function updateSchedule(Request $request) {
+        $userid = session('userid');
+        $level = session('level');
+        if ($level != 2) {
+            if ($request->expectsJson() || $request->ajax()) return response()->json(['success'=>false,'message'=>'Only teachers can update schedule'],403);
+            return back()->with('error','Only teachers can update schedule');
+        }
+        $teacher = DB::table('teacher')->where('userid',$userid)->first();
+        if (!$teacher) {
+            if ($request->expectsJson() || $request->ajax()) return response()->json(['success'=>false,'message'=>'Teacher not found'],404);
+            return back()->with('error','Teacher not found');
+        }
+        $days = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'];
+        $updates = [];
+        foreach ($days as $d) {
+            $start = $request->input($d.'_start');
+            $end = $request->input($d.'_end');
+            if ($start && $end) {
+                if (strtotime($end) <= strtotime($start)) {
+                    $msg = ucfirst($d).' end time must be after start time';
+                    if ($request->expectsJson() || $request->ajax()) return response()->json(['success'=>false,'message'=>$msg],400);
+                    return back()->with('error', $msg);
+                }
+                $diff = strtotime($end) - strtotime($start);
+                $minSeconds = in_array($d, ['saturday','sunday']) ? 10800 : 18000;
+                if ($diff < $minSeconds) {
+                    $msg = in_array($d, ['saturday','sunday'])
+                        ? ucfirst($d).' must be at least 3 hours'
+                        : ucfirst($d).' must be at least 5 hours';
+                    if ($request->expectsJson() || $request->ajax()) return response()->json(['success'=>false,'message'=>$msg],400);
+                    return back()->with('error', $msg);
+                }
+                $updates[$d] = ['start'=>$start,'end'=>$end];
+            }
+        }
+        DB::beginTransaction();
+        try {
+            foreach ($updates as $day => $t) {
+                $exists = DB::table('schedule')->where('teacherid',$teacher->teacherid)->where('day_of_week',$day)->first();
+                $payload = [
+                    'teacherid' => $teacher->teacherid,
+                    'day_of_week' => $day,
+                    'start_time' => $t['start'],
+                    'end_time' => $t['end'],
+                    'status' => 1,
+                    'updated_at' => now()
+                ];
+                if ($exists) {
+                    DB::table('schedule')->where('scheduleid',$exists->scheduleid)->update($payload);
+                } else {
+                    $payload['created_at'] = now();
+                    DB::table('schedule')->insert($payload);
+                }
+            }
+            DB::commit();
+            if ($request->expectsJson() || $request->ajax()) return response()->json(['success'=>true,'message'=>'Schedule updated']);
+            return back()->with('success','Schedule updated');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            $msg = 'Failed to update schedule: '.$e->getMessage();
+            if ($request->expectsJson() || $request->ajax()) return response()->json(['success'=>false,'message'=>$msg],500);
+            return back()->with('error',$msg);
+        }
     }
 
     public function updateprofile(Request $request){
@@ -2534,6 +2617,7 @@ class Ctrl extends Controller
 
     public function teacherlist(){
         $system = DB::table('system')->first();
+        $this->cancelExpiredConsultations();
         
         $teachers = DB::table('teacher')
             ->leftJoin('homeroomtc', 'homeroomtc.teacherid', '=', 'teacher.teacherid')
@@ -2550,10 +2634,45 @@ class Ctrl extends Controller
                 ->get();
         }
 
+        $hasActiveBooking = false;
+        if (session('level') == 3) {
+            $stu = DB::table('student')->where('userid', session('userid'))->first();
+            if ($stu) {
+                $hasActiveBooking = DB::table('consult')
+                    ->where('studentid', $stu->studentid)
+                    ->whereIn('status', ['pending','active'])
+                    ->exists();
+            }
+        }
         echo view('all.header', compact('system'));
         echo view('all.menu', compact('system'));
-        echo view('student.teacherlist', ['data' => $teachers]);
+        echo view('student.teacherlist', ['data' => $teachers, 'hasActiveBooking'=>$hasActiveBooking]);
         echo view('all.footer');
+    }
+    private function cancelExpiredConsultations() {
+        $nowDate = date('Y-m-d');
+        $nowTime = date('H:i:s');
+        $rows = DB::table('consult')
+            ->join('time_slots','time_slots.slotid','=','consult.slotid')
+            ->where('consult.status','pending')
+            ->where(function($q) use ($nowDate,$nowTime){
+                $q->where('time_slots.date','<',$nowDate)
+                  ->orWhere(function($w) use ($nowDate,$nowTime){
+                      $w->where('time_slots.date',$nowDate)->where('time_slots.end_time','<=',$nowTime);
+                  });
+            })
+            ->select('consult.consultid','consult.studentid','time_slots.slotid','time_slots.teacherid','time_slots.date','time_slots.start_time','time_slots.end_time')
+            ->get();
+        foreach ($rows as $r) {
+            DB::table('consult')->where('consultid',$r->consultid)->update(['status'=>'cancelled']);
+            DB::table('time_slots')->where('slotid',$r->slotid)->update(['is_booked'=>0]);
+            $studentUser = DB::table('student')->where('studentid',$r->studentid)->value('userid');
+            $teacherUser = DB::table('teacher')->where('teacherid',$r->teacherid)->value('userid');
+            if ($studentUser) $this->pushNotification($studentUser,'Consultation Expired','Your consultation request expired without approval');
+            if ($teacherUser) $this->pushNotification($teacherUser,'Consultation Expired','A pending consultation request expired without approval');
+            $msg = "**Action:** auto_cancel_consult\n**Slot:** ".$r->date." ".$r->start_time."-".$r->end_time;
+            $this->sendDiscordWebhook($msg);
+        }
     }
 
     public function getAvailableTimes(Request $request) {
@@ -2774,6 +2893,42 @@ class Ctrl extends Controller
         echo view('all.menu', compact('system'));
         echo view('student.chat', compact('consults'));
         echo view('all.footer');
+    }
+    public function searchConsultations(Request $request) {
+        $userid = session('userid');
+        $level = session('level');
+        $q = strtolower(trim($request->query('q', '')));
+        $query = DB::table('consult')
+            ->join('time_slots', 'time_slots.slotid', '=', 'consult.slotid')
+            ->join('teacher', 'teacher.teacherid', '=', 'time_slots.teacherid')
+            ->join('student', 'student.studentid', '=', 'consult.studentid');
+        if ($level == 3) {
+            $student = DB::table('student')->where('userid', $userid)->first();
+            if ($student) $query->where('consult.studentid', $student->studentid);
+        } else if ($level == 2) {
+            $teacher = DB::table('teacher')->where('userid', $userid)->first();
+            if ($teacher) $query->where('time_slots.teacherid', $teacher->teacherid);
+        } else {
+            return response()->json(['success'=>false,'rows'=>[]],403);
+        }
+        if ($q !== '') {
+            $query->where(function($w) use ($q){
+                $w->whereRaw('LOWER(consult.problem) LIKE ?', ['%'.$q.'%'])
+                  ->orWhereRaw('LOWER(teacher.name) LIKE ?', ['%'.$q.'%'])
+                  ->orWhereRaw('LOWER(student.name) LIKE ?', ['%'.$q.'%']);
+            });
+        }
+        $rows = $query->select(
+            'consult.consultid',
+            'consult.problem',
+            'consult.status',
+            'teacher.name as teacher_name',
+            'student.name as student_name',
+            'time_slots.date',
+            'time_slots.start_time',
+            'time_slots.end_time'
+        )->orderBy('consult.created_at','desc')->limit(100)->get();
+        return response()->json(['success'=>true,'rows'=>$rows]);
     }
 
     public function getMessages($id) {

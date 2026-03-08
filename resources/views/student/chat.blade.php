@@ -7,10 +7,11 @@
                         <!-- Sidebar: Chat History / List -->
                         <div class="col-lg-3 col-xl-3 border-end">
                             <div class="card-body border-bottom">
-                                <h5 class="card-title mb-0">Consultation List</h5>
+                                <h5 class="card-title mb-2">Consultation List</h5>
+                                <input type="text" id="consult-search" class="form-control" placeholder="Search by name or problem">
                             </div>
                             <div class="scrollable position-relative" style="height: calc(100vh - 250px); overflow-y: auto;">
-                                <ul class="mailbox list-style-none">
+                                <ul class="mailbox list-style-none" id="consult-list">
                                     <li>
                                         <div class="message-center">
                                             @foreach($consults as $c)
@@ -188,6 +189,50 @@
     let chatInterval = null;
     let timeCheckInterval = null;
     let hasReport = false;
+    const consultSearch = document.getElementById('consult-search');
+    const consultList = document.getElementById('consult-list');
+    let consultSearchTimer = null;
+    function renderConsultRows(rows) {
+        if (!consultList) return;
+        consultList.innerHTML = '<li><div class="message-center">';
+        rows.forEach(function(c){
+            const disabled = (c.status === 'cancelled') ? 'disabled-item' : '';
+            const opacity = (c.status === 'cancelled') ? 'opacity: 0.5; cursor: not-allowed;' : '';
+            const badgeClass = c.status === 'active' ? 'bg-success' : (c.status === 'pending' ? 'bg-warning' : (c.status === 'completed' ? 'bg-info' : 'bg-danger'));
+            const displayName = ({{ session('level') }} == 3) ? c.teacher_name : c.student_name;
+            const onclickAttr = (c.status !== 'cancelled') ? `onclick="loadChat('${c.consultid}','${displayName}','${c.date}','${c.start_time}','${c.end_time}','${c.status}')"` : '';
+            consultList.innerHTML += `
+                <a href="javascript:void(0)" ${onclickAttr}
+                   class="message-item d-flex align-items-center border-bottom px-3 py-2 consult-item ${disabled}" 
+                   id="consult-${c.consultid}" style="${opacity}">
+                    <div class="user-img">
+                        <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
+                            ${displayName ? displayName.substring(0,1) : '?'}
+                        </div>
+                    </div>
+                    <div class="w-75 d-inline-block v-middle ps-2">
+                        <h6 class="message-title mb-0 mt-1">${displayName || ''}</h6>
+                        <span class="font-12 text-nowrap d-block text-muted text-truncate">${c.problem || ''}</span>
+                        <span class="font-12 text-nowrap d-block text-muted">${(c.date || '')}</span>
+                        <span class="badge ${badgeClass} font-10 text-white">${(c.status || '').charAt(0).toUpperCase() + (c.status || '').slice(1)}</span>
+                    </div>
+                </a>`;
+        });
+        consultList.innerHTML += '</div></li>';
+    }
+    if (consultSearch) {
+        consultSearch.addEventListener('input', function(){
+            clearTimeout(consultSearchTimer);
+            const q = this.value.trim();
+            consultSearchTimer = setTimeout(function(){
+                fetch('/chat/search?q=' + encodeURIComponent(q), { headers: { 'Accept':'application/json' } })
+                    .then(r=>r.json())
+                    .then(data=>{
+                        if (data.success) renderConsultRows(data.rows || []);
+                    });
+            }, 250);
+        });
+    }
 
     function loadChat(id, name, date, start, end, status) {
         currentConsultId = id;

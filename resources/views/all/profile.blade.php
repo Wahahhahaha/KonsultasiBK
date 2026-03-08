@@ -29,6 +29,12 @@
                                 <div class="card">
                                     <div class="card-body">
                                         <h4 class="card-title">Profile</h4>
+                                        @if(session('success'))
+                                            <div class="alert alert-success">{{ session('success') }}</div>
+                                        @endif
+                                        @if(session('error'))
+                                            <div class="alert alert-danger">{{ session('error') }}</div>
+                                        @endif
                                         <form class="mt-4" action="/myprofile/update" method="post" enctype="multipart/form-data">
                                             @csrf
                                             <div class="form-group mb-3">
@@ -62,6 +68,61 @@
                                     </div>
                                 </div>
                             </div>
+                            @if(($data->teacher_roleid ?? null) == 3)
+                            <div class="col-md-6">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h4 class="card-title">Manage Schedule</h4>
+                                        <p class="small text-muted mb-3">Weekdays minimum 5 hours, Weekend minimum 3 hours per day.</p>
+                                        <div id="schedule-status" class="mb-2"></div>
+                                        <form id="scheduleForm" action="/myprofile/update-schedule" method="post">
+                                            @csrf
+                                            @php
+                                                $days = ['monday'=>'Monday','tuesday'=>'Tuesday','wednesday'=>'Wednesday','thursday'=>'Thursday','friday'=>'Friday','saturday'=>'Saturday','sunday'=>'Sunday'];
+                                            @endphp
+                                            @foreach($days as $k => $label)
+                                            <div class="row align-items-center mb-2">
+                                                <div class="col-4"><label class="mb-0">{{ $label }}</label></div>
+                                                <div class="col-4">
+                                                    <input type="time" class="form-control" name="{{ $k }}_start" value="{{ isset($teacherSchedules[$k]) ? substr($teacherSchedules[$k]['start'],0,5) : '' }}">
+                                                </div>
+                                                <div class="col-4">
+                                                    <input type="time" class="form-control" name="{{ $k }}_end" value="{{ isset($teacherSchedules[$k]) ? substr($teacherSchedules[$k]['end'],0,5) : '' }}">
+                                                </div>
+                                            </div>
+                                            @endforeach
+                                            <div class="form-group mt-3">
+                                                <button type="submit" class="btn btn-primary w-100">Save Schedule</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                            @endif
+                            @if(($data->teacher_roleid ?? null) == 3)
+                            <div class="col-md-6">
+                                <div class="card mt-3">
+                                    <div class="card-body">
+                                        <h4 class="card-title">Change Phone (WhatsApp OTP)</h4>
+                                        <div class="form-group mb-3">
+                                            <label>New Phone (WhatsApp)</label>
+                                            <input type="text" class="form-control" id="new_phone" placeholder="08xxxx">
+                                        </div>
+                                        <div class="form-group mb-3">
+                                            <button class="btn btn-dark w-100" type="button" onclick="requestPhoneOtp()">Send OTP via WhatsApp</button>
+                                        </div>
+                                        <div class="form-group mb-3">
+                                            <label>Enter OTP</label>
+                                            <input type="text" class="form-control" id="phone_otp" placeholder="6-digit OTP">
+                                        </div>
+                                        <div class="form-group mb-3">
+                                            <button class="btn btn-primary w-100" type="button" onclick="confirmPhoneOtp()">Confirm & Update Phone</button>
+                                        </div>
+                                        <div id="phone-otp-status" class="small text-muted"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            @endif
                             <div class="col-md-6">
                                 <div class="card">
                                     <div class="card-body">
@@ -93,26 +154,6 @@
                                                 <button type="submit" class="btn btn-primary w-100">Change Password</button>
                                             </div>
                                         </form>
-                                    </div>
-                                </div>
-                                <div class="card mt-3">
-                                    <div class="card-body">
-                                        <h4 class="card-title">Change Phone (WhatsApp OTP)</h4>
-                                        <div class="form-group mb-3">
-                                            <label>New Phone (WhatsApp)</label>
-                                            <input type="text" class="form-control" id="new_phone" placeholder="08xxxx">
-                                        </div>
-                                        <div class="form-group mb-3">
-                                            <button class="btn btn-dark w-100" type="button" onclick="requestPhoneOtp()">Send OTP via WhatsApp</button>
-                                        </div>
-                                        <div class="form-group mb-3">
-                                            <label>Enter OTP</label>
-                                            <input type="text" class="form-control" id="phone_otp" placeholder="6-digit OTP">
-                                        </div>
-                                        <div class="form-group mb-3">
-                                            <button class="btn btn-primary w-100" type="button" onclick="confirmPhoneOtp()">Confirm & Update Phone</button>
-                                        </div>
-                                        <div id="phone-otp-status" class="small text-muted"></div>
                                     </div>
                                 </div>
                             </div>
@@ -170,4 +211,36 @@ function confirmPhoneOtp() {
         }
     });
 }
+</script>
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+    const schedForm = document.getElementById('scheduleForm');
+    if (schedForm) {
+        schedForm.addEventListener('submit', function(e){
+            e.preventDefault();
+            const statusEl = document.getElementById('schedule-status');
+            statusEl.className = '';
+            statusEl.textContent = '';
+            const formData = new FormData(schedForm);
+            const payload = {};
+            for (const [k,v] of formData.entries()) { payload[k]=v; }
+            fetch('/myprofile/update-schedule', {
+                method: 'POST',
+                headers: { 'Content-Type':'application/json', 'Accept':'application/json', 'X-Requested-With':'XMLHttpRequest', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                body: JSON.stringify(payload)
+            }).then(r=>r.json()).then(data=>{
+                if (data.success) {
+                    statusEl.className = 'alert alert-success';
+                    statusEl.textContent = data.message || 'Schedule updated';
+                } else {
+                    statusEl.className = 'alert alert-danger';
+                    statusEl.textContent = data.message || 'Failed to update schedule';
+                }
+            }).catch(()=>{
+                statusEl.className = 'alert alert-danger';
+                statusEl.textContent = 'Network error';
+            });
+        });
+    }
+});
 </script>

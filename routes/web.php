@@ -27,6 +27,7 @@ Route::post('/myprofile/update', 'App\Http\Controllers\Ctrl@updateprofile');
 Route::post('/myprofile/changepw', 'App\Http\Controllers\Ctrl@changepw');
 Route::post('/myprofile/request-phone-otp', 'App\Http\Controllers\Ctrl@requestPhoneOtp');
 Route::post('/myprofile/confirm-phone-otp', 'App\Http\Controllers\Ctrl@confirmPhoneOtp');
+Route::post('/myprofile/update-schedule', 'App\Http\Controllers\Ctrl@updateSchedule');
 Route::get('/myprofile/verify-email', 'App\Http\Controllers\Ctrl@verifyEmailChange');
 
 Route::get('/setting', 'App\Http\Controllers\Ctrl@setting');
@@ -56,6 +57,7 @@ Route::get('/database/export', 'App\Http\Controllers\Ctrl@exportDatabase');
 Route::post('/database/import', 'App\Http\Controllers\Ctrl@importDatabase');
 
 Route::get('/chat', 'App\Http\Controllers\Ctrl@chat');
+Route::get('/chat/search', 'App\Http\Controllers\Ctrl@searchConsultations');
 Route::get('/chat/messages/{id}', 'App\Http\Controllers\Ctrl@getMessages');
 Route::post('/chat/send', 'App\Http\Controllers\Ctrl@sendMessage');
 Route::post('/chat/end', 'App\Http\Controllers\Ctrl@endConsultation');

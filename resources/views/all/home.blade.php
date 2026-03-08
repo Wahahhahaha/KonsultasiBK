@@ -162,13 +162,18 @@
                                                 </div>
                                             </div>
                                             @if(session('userid'))
-                                                <button class="btn btn-primary btn-book mt-3"
-                                                    data-bs-toggle="modal"
-                                                    data-bs-target="#bookConsult"
-                                                    data-teacherid="{{ $key->teacherid }}"
-                                                    data-teachername="{{ $key->name }}">
-                                                    Book Consult
-                                                </button>
+                                                @if((session('level') == 3) && ($hasActiveBooking ?? false))
+                                                    <button class="btn btn-secondary mt-3" disabled>Book Consult</button>
+                                                    <div class="small text-muted mt-1">You have an active consultation</div>
+                                                @else
+                                                    <button class="btn btn-primary btn-book mt-3"
+                                                        data-bs-toggle="modal"
+                                                        data-bs-target="#bookConsult"
+                                                        data-teacherid="{{ $key->teacherid }}"
+                                                        data-teachername="{{ $key->name }}">
+                                                        Book Consult
+                                                    </button>
+                                                @endif
                                             @else
                                                 <span class="text-muted small mt-3">Login to book consultation</span>
                                             @endif

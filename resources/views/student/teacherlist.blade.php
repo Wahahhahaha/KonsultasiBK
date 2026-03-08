@@ -37,8 +37,7 @@
                             <div class="col-lg-3 col-md-6">
                                 <!-- Card -->
                                 <div class="card">
-                                    <img class="card-img-top img-fluid" src="../assets/images/big/img1.jpg"
-                                        alt="Card image cap">
+                        
                                     <div class="card-body">
                                         <h4 class="card-title"><?= $key->name ?></h4>
                                         <div class="card-text mb-2">
@@ -113,13 +112,18 @@
                                                 <?php } ?>
                                             </div>
                                         </div>
-                                        <button class="btn btn-primary btn-book w-100" 
-                                            data-bs-toggle="modal" 
-                                            data-bs-target="#bookConsult"
-                                            data-teacherid="<?= $key->teacherid ?>"
-                                            data-teachername="<?= $key->name ?>">
-                                            Book Consult
-                                        </button>
+                                        <?php if(isset($hasActiveBooking) && $hasActiveBooking) { ?>
+                                            <button class="btn btn-secondary w-100" disabled>Book Consult</button>
+                                            <div class="text-muted small">You have an active consultation</div>
+                                        <?php } else { ?>
+                                            <button class="btn btn-primary btn-book w-100" 
+                                                data-bs-toggle="modal" 
+                                                data-bs-target="#bookConsult"
+                                                data-teacherid="<?= $key->teacherid ?>"
+                                                data-teachername="<?= $key->name ?>">
+                                                Book Consult
+                                            </button>
+                                        <?php } ?>
                                     </div>
                                 </div>
                             </div>

@@ -32,6 +32,8 @@
                         <!-- ============================================================== -->
                         <!-- Right side toggle and nav items -->
                         <!-- ============================================================== -->
+
+                        @if(session('is_login') === true)
                         <ul class="navbar-nav float-end">
                             <!-- ============================================================== -->
                             <!-- User profile and search -->
@@ -85,6 +87,7 @@
                                 <i class="fa fa-angle-right"></i>
                             </a>
                         </li>
+
                     </ul>
                 </div>
             </li>
@@ -95,22 +98,19 @@
                 class="text-dark">{{ session('name') }}</span> <i data-feather="chevron-down"
                 class="svg-icon"></i></span>
             </a>
+
             <div class="dropdown-menu dropdown-menu-end dropdown-menu-right user-dd animated flipInY">
                 <a class="dropdown-item" href="/myprofile"><i data-feather="user"
                     class="svg-icon me-2 ms-1"></i>
                 My Profile</a>
                 <div class="dropdown-divider"></div>
-                @if(session('level') == 2)
-                <a class="dropdown-item" href="/followups"><i data-feather="clipboard"
-                    class="svg-icon me-2 ms-1"></i>
-                Follow-ups</a>
-                @endif
-                <div class="dropdown-divider"></div>
                 <a class="dropdown-item" href="/logout"><i data-feather="power"
                     class="svg-icon me-2 ms-1"></i>
                 Logout</a>
             </div>
+
         </li>
+        @endif
         <!-- ============================================================== -->
         <!-- User profile and search -->
         <!-- ============================================================== -->
