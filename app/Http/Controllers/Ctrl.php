@@ -310,6 +310,195 @@ class Ctrl extends Controller
 
 //==============================================================================================
 
+    public function forgotPassword(Request $request){
+        $system = DB::table('system')->first();
+        echo view('all.header', compact('system'));
+        echo view('all.forgot_password', compact('system'));
+        echo view('all.footer');
+    }
+
+    private function findUserIdByEmail($email){
+        $row = DB::table('student')->where('email',$email)->select('userid')->first();
+        if ($row) return $row->userid;
+        $row = DB::table('teacher')->where('email',$email)->select('userid')->first();
+        if ($row) return $row->userid;
+        $row = DB::table('employer')->where('email',$email)->select('userid')->first();
+        if ($row) return $row->userid;
+        return null;
+    }
+
+    private function findUserIdByPhone($phone){
+        $row = DB::table('student')->where('phonenumber',$phone)->select('userid')->first();
+        if ($row) return $row->userid;
+        $row = DB::table('teacher')->where('phonenumber',$phone)->select('userid')->first();
+        if ($row) return $row->userid;
+        $row = DB::table('employer')->where('phonenumber',$phone)->select('userid')->first();
+        if ($row) return $row->userid;
+        return null;
+    }
+
+    public function forgotPasswordByEmail(Request $request){
+        $request->validate(['email' => 'required|email']);
+        $email = $request->email;
+        $userid = $this->findUserIdByEmail($email);
+        if (!$userid) {
+            return back()->with('error','Email tidak ditemukan');
+        }
+        if (!Schema::hasTable('password_resets_app')) {
+            Schema::create('password_resets_app', function($table){
+                $table->increments('id');
+                $table->string('email')->index();
+                $table->string('token');
+                $table->integer('userid');
+                $table->timestamp('created_at')->nullable();
+                $table->timestamp('expires_at')->nullable();
+            });
+        }
+        $token = Str::random(60);
+        $expires = now()->addMinutes(60);
+        $exists = DB::table('password_resets_app')->where('email',$email)->first();
+        if ($exists) {
+            DB::table('password_resets_app')->where('email',$email)->update([
+                'token'=>$token,
+                'userid'=>$userid,
+                'created_at'=>now(),
+                'expires_at'=>$expires
+            ]);
+        } else {
+            DB::table('password_resets_app')->insert([
+                'email'=>$email,
+                'token'=>$token,
+                'userid'=>$userid,
+                'created_at'=>now(),
+                'expires_at'=>$expires
+            ]);
+        }
+        $link = url('/reset-password') . '?token=' . urlencode($token) . '&email=' . urlencode($email);
+        try {
+            Mail::raw("Klik tautan berikut untuk reset password: ".$link, function($m) use ($email){
+                $m->to($email)->subject('Reset Password');
+            });
+        } catch (\Exception $e) {
+        }
+        return back()->with('success','Link reset sudah dikirim ke email jika tersedia');
+    }
+
+    public function resetPasswordForm(Request $request){
+        $system = DB::table('system')->first();
+        $token = $request->query('token');
+        $email = $request->query('email');
+        if (!$token || !$email) {
+            return redirect('/forgot-password')->with('error','Permintaan tidak valid');
+        }
+        if (!Schema::hasTable('password_resets_app')) {
+            return redirect('/forgot-password')->with('error','Token tidak valid');
+        }
+        $rec = DB::table('password_resets_app')->where('email',$email)->where('token',$token)->first();
+        if (!$rec) {
+            return redirect('/forgot-password')->with('error','Token tidak ditemukan');
+        }
+        if ($rec->expires_at && strtotime($rec->expires_at) < time()) {
+            return redirect('/forgot-password')->with('error','Token kedaluwarsa');
+        }
+        echo view('all.header', compact('system'));
+        echo view('all.reset_password', ['method'=>'email','token'=>$token,'email'=>$email]);
+        echo view('all.footer');
+    }
+
+    public function resetPasswordSubmit(Request $request){
+        $request->validate([
+            'email' => 'required|email',
+            'token' => 'required',
+            'password' => 'required|min:6|confirmed'
+        ]);
+        if (!Schema::hasTable('password_resets_app')) {
+            return redirect('/forgot-password')->with('error','Token tidak valid');
+        }
+        $rec = DB::table('password_resets_app')->where('email',$request->email)->where('token',$request->token)->first();
+        if (!$rec) {
+            return redirect('/forgot-password')->with('error','Token tidak ditemukan');
+        }
+        if ($rec->expires_at && strtotime($rec->expires_at) < time()) {
+            return redirect('/forgot-password')->with('error','Token kedaluwarsa');
+        }
+        DB::table('user')->where('userid',$rec->userid)->update([
+            'password' => Hash::make($request->password)
+        ]);
+        DB::table('password_resets_app')->where('id',$rec->id)->delete();
+        return redirect('/login')->with('success','Password berhasil diubah, silakan login');
+    }
+
+    public function forgotPasswordByPhone(Request $request){
+        $request->validate(['phone' => 'required']);
+        $phone = $request->phone;
+        $userid = $this->findUserIdByPhone($phone);
+        if (!$userid) {
+            return back()->with('error','Nomor telepon tidak ditemukan');
+        }
+        $otp = str_pad((string)random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+        Session::put('password_reset_phone', [
+            'phone'=>$phone,
+            'userid'=>$userid,
+            'otp'=>$otp,
+            'expires_at'=>time()+600
+        ]);
+        $token = env('FONNTE_TOKEN');
+        if ($token) {
+            try {
+                Http::withHeaders(['Authorization'=>$token])->asForm()->post('https://api.fonnte.com/send',[
+                    'target'=>$phone,
+                    'message'=>"Kode reset password: {$otp}. Berlaku 10 menit.",
+                    'countryCode'=>'62'
+                ]);
+            } catch (\Exception $e) {
+            }
+        }
+        return redirect('/reset-password/phone?phone='.urlencode($phone))->with('success','OTP sudah dikirim');
+    }
+
+    public function resetPasswordPhoneForm(Request $request){
+        $system = DB::table('system')->first();
+        $phone = $request->query('phone');
+        if (!$phone) {
+            return redirect('/forgot-password')->with('error','Permintaan tidak valid');
+        }
+        $pending = Session::get('password_reset_phone');
+        if (!$pending || $pending['phone'] !== $phone) {
+            return redirect('/forgot-password')->with('error','Tidak ada permintaan OTP');
+        }
+        if (time() > $pending['expires_at']) {
+            Session::forget('password_reset_phone');
+            return redirect('/forgot-password')->with('error','OTP kedaluwarsa');
+        }
+        echo view('all.header', compact('system'));
+        echo view('all.reset_password', ['method'=>'phone','phone'=>$phone]);
+        echo view('all.footer');
+    }
+
+    public function resetPasswordPhoneSubmit(Request $request){
+        $request->validate([
+            'phone' => 'required',
+            'otp' => 'required',
+            'password' => 'required|min:6|confirmed'
+        ]);
+        $pending = Session::get('password_reset_phone');
+        if (!$pending || $pending['phone'] !== $request->phone) {
+            return redirect('/forgot-password')->with('error','Tidak ada permintaan OTP');
+        }
+        if (time() > $pending['expires_at']) {
+            Session::forget('password_reset_phone');
+            return redirect('/forgot-password')->with('error','OTP kedaluwarsa');
+        }
+        if ($request->otp !== $pending['otp']) {
+            return back()->with('error','OTP tidak sesuai');
+        }
+        DB::table('user')->where('userid',$pending['userid'])->update([
+            'password'=>Hash::make($request->password)
+        ]);
+        Session::forget('password_reset_phone');
+        return redirect('/login')->with('success','Password berhasil diubah, silakan login');
+    }
+
     public function loadactivation(){
         echo view ('all.header',compact('system'));
         echo view ('all.loadactivation');
@@ -405,8 +594,8 @@ class Ctrl extends Controller
             'name' => 'required',
             'username' => 'required|unique:user,username',
             'email' => 'required|unique:student,email|unique:employer,email|unique:teacher,email',
-                'phonenumber' => 'required|unique:student,phonenumber|unique:employer,phonenumber|unique:teacher,phonenumber',
-                'level' => 'required',
+            'phonenumber' => 'required|unique:student,phonenumber|unique:employer,phonenumber|unique:teacher,phonenumber',
+            'level' => 'required',
         ];
         if ($request->level == 3) {
             $rules['role'] = 'nullable';
@@ -416,6 +605,9 @@ class Ctrl extends Controller
 
         $validator = Validator::make($request->all(), $rules);
         if ($validator->fails()) {
+            if ($request->ajax()) {
+                return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
+            }
             return redirect()->back()
                 ->withErrors($validator)
                 ->withInput()
@@ -433,15 +625,21 @@ class Ctrl extends Controller
 
        
         if ($request->level == 3) {
-            $rules['classid'] = 'required|exists:class,classid';
-            // Re-validate with class rule when level is student
-            $validator = Validator::make($request->all(), $rules);
-            if ($validator->fails()) {
+            $classValidator = Validator::make($request->all(), [
+                'classid' => 'required|exists:class,classid'
+            ]);
+            
+            if ($classValidator->fails()) {
+                DB::rollBack();
+                if ($request->ajax()) {
+                    return response()->json(['success' => false, 'errors' => $classValidator->errors()], 422);
+                }
                 return redirect()->back()
-                    ->withErrors($validator)
+                    ->withErrors($classValidator)
                     ->withInput()
                     ->with('error', 'Please fix the errors below');
             }
+            
             DB::table('student')->insert([
                 'name' => $request->name,
                 'email' => $request->email,
@@ -491,10 +689,16 @@ class Ctrl extends Controller
         $details = 'username=' . $request->username . '; level=' . ($levelMap[$request->level] ?? (string)$request->level) . '; role=' . ($request->role ?? '');
         $this->logActivity($request, 'add_user', $userid, null, null, $details);
 
+        if ($request->ajax()) {
+            return response()->json(['success' => true, 'message' => 'User successfully added']);
+        }
         return redirect()->back()->with('success', 'User successfully added');
 
         } catch (\Exception $e) {
             DB::rollback();
+            if ($request->ajax()) {
+                return response()->json(['success' => false, 'message' => 'Failed to add user: ' . $e->getMessage()], 500);
+            }
             return redirect()->back()
                 ->withInput()
                 ->with('error', 'Failed to add user: ' . $e->getMessage());
@@ -548,6 +752,9 @@ class Ctrl extends Controller
         $details = 'userid=' . $id . '; username=' . ($user->username ?? '') . '; level=' . $levelLabel;
         $this->logActivity(request(), 'delete_user', null, null, null, $details);
 
+        if (request()->ajax()) {
+            return response()->json(['success' => true, 'message' => 'User deleted successfully']);
+        }
         return back();
     }
 
@@ -2265,6 +2472,7 @@ class Ctrl extends Controller
             ->leftJoin('student', 'student.userid', '=', 'user.userid')
             ->leftJoin('employer', 'employer.userid', '=', 'user.userid')
             ->leftJoin('teacher', 'teacher.userid', '=', 'user.userid')
+
             ->leftJoin('class', 'class.classid', '=', 'student.studentid')
             ->leftJoin('major', 'major.majorid', '=', 'class.classid')
             ->leftJoin('grade', 'grade.gradeid', '=', 'class.classid')
@@ -2785,7 +2993,9 @@ class Ctrl extends Controller
             foreach ($existingSlots as $slot) {
                 // Gunakan format jam yang sama untuk perbandingan (H:i:s)
                 $currentTimeStr = date('H:i:s');
-                $isPast = $isToday && ($slot->start_time < $currentTimeStr);
+                // Jika hari ini, slot dianggap lewat jika waktu mulainya kurang dari atau sama dengan waktu sekarang
+                // Tambahkan buffer kecil (misal 1 menit) jika perlu, tapi strict comparison sudah cukup
+                $isPast = $isToday && ($slot->start_time <= $currentTimeStr);
 
                 $slots[] = [
                     'slotid' => $slot->slotid,
@@ -3091,8 +3301,16 @@ class Ctrl extends Controller
             return response()->json(['success' => false, 'message' => 'Consult not found'], 404);
         }
         $teacher = DB::table('teacher')->where('userid', $userid)->first();
-        if (!$teacher || $teacher->teacherid != $consult->slot_teacherid) {
-            return response()->json(['success' => false, 'message' => 'Not your consultation'], 403);
+        if (!$teacher) {
+            return response()->json(['success' => false, 'message' => 'Teacher profile not found'], 404);
+        }
+        
+        // Perbaiki pengecekan kepemilikan
+        // Pastikan teacherid yang sedang login SAMA DENGAN teacherid pemilik slot
+        if ($teacher->teacherid != $consult->slot_teacherid) {
+             // Debugging info (optional, remove in production)
+             // return response()->json(['success' => false, 'message' => "Not your consultation. You are {$teacher->teacherid}, owner is {$consult->slot_teacherid}"], 403);
+             return response()->json(['success' => false, 'message' => 'Not your consultation'], 403);
         }
         $needFollow = (bool)$request->need_follow_up;
         $followNotes = $request->follow_up_notes;

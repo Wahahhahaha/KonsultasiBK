@@ -8,6 +8,14 @@ Route::get('/login', 'App\Http\Controllers\Ctrl@login');
 Route::post('/login/process', 'App\Http\Controllers\Ctrl@loginact');
 Route::get('/logout', 'App\Http\Controllers\Ctrl@logout');
 
+Route::get('/forgot-password', 'App\Http\Controllers\Ctrl@forgotPassword');
+Route::post('/forgot-password/email', 'App\Http\Controllers\Ctrl@forgotPasswordByEmail');
+Route::post('/forgot-password/phone', 'App\Http\Controllers\Ctrl@forgotPasswordByPhone');
+Route::get('/reset-password', 'App\Http\Controllers\Ctrl@resetPasswordForm');
+Route::get('/reset-password/phone', 'App\Http\Controllers\Ctrl@resetPasswordPhoneForm');
+Route::post('/reset-password', 'App\Http\Controllers\Ctrl@resetPasswordSubmit');
+Route::post('/reset-password/phone', 'App\Http\Controllers\Ctrl@resetPasswordPhoneSubmit');
+
 Route::get('/home', 'App\Http\Controllers\Ctrl@home');
 
 Route::get('/userdata', 'App\Http\Controllers\Ctrl@userdata');

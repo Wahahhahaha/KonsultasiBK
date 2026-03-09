@@ -105,6 +105,9 @@
                                 <div class="col-lg-12  justify-content-between" style="padding-top: 15px; padding-bottom: 15px;">
                                     <button type="submit" class="btn w-100 btn-dark">Sign In</button>
                                 </div>
+                                <div class="col-lg-12 text-center">
+                                    <a href="/forgot-password" class="small">Forgot password?</a>
+                                </div>
                             </div>
                         </form>
                     </div>
