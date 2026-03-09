@@ -55,7 +55,7 @@
                                             </div>
                                             <div class="form-group mb-3">
                                                 <label>Email</label>
-                                                <input type="email" class="form-control" value="<?=$data->email ?>" name="email">
+                                                <input type="email" class="form-control" value="<?=$data->email ?>" disabled>
                                             </div>
                                             <div class="form-group mb-3">
                                                 <label>Phonenumber</label>
@@ -99,7 +99,7 @@
                                 </div>
                             </div>
                             @endif
-                            @if(($data->teacher_roleid ?? null) == 3)
+                            
                             <div class="col-md-6">
                                 <div class="card mt-3">
                                     <div class="card-body">
@@ -122,9 +122,26 @@
                                     </div>
                                 </div>
                             </div>
-                            @endif
+
                             <div class="col-md-6">
-                                <div class="card">
+                                <div class="card mt-3">
+                                    <div class="card-body">
+                                        <h4 class="card-title">Change Email</h4>
+                                        <form action="/myprofile/request-email-change" method="post">
+                                            @csrf
+                                            <div class="form-group mb-3">
+                                                <label>New Email Address</label>
+                                                <input type="email" class="form-control" name="new_email" required placeholder="Enter new email">
+                                            </div>
+                                            <div class="form-group mb-3">
+                                                <button type="submit" class="btn btn-info w-100">Send Verification Link</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="card mt-3">
                                     <div class="card-body">
                                         <h4 class="card-title">Change Password</h4>
                                         <form class="mt-4" action="/myprofile/changepw" method="post">
@@ -200,7 +217,7 @@ function confirmPhoneOtp() {
     const otp = document.getElementById('phone_otp').value.trim();
     const statusEl = document.getElementById('phone-otp-status');
     if (!otp) { statusEl.textContent = 'Please enter OTP.'; return; }
-    fetch('/myprofile/confirm-phone-otp', {
+    fetch('/myprofile/verify-phone-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
         body: JSON.stringify({ otp })

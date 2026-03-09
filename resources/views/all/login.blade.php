@@ -13,6 +13,12 @@
                         </div>
                         <h2 class="mt-3 text-center">Sign In</h2>
                         <p class="text-center">Enter your email address and password to access the website.</p>
+                        @if(session('error'))
+                        <div class="alert alert-danger">{{ session('error') }}</div>
+                        @endif
+                        @if(session('success'))
+                        <div class="alert alert-success">{{ session('success') }}</div>
+                        @endif
                         <form action="/login/process" method="post">
                                     @csrf
                             <div class="row">

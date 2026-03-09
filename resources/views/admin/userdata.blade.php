@@ -166,6 +166,32 @@
                         </select>
                         <div class="invalid-feedback" id="error-role"></div>
                     </div>
+
+                    <div id="homeroomClassWrapper" style="margin-top: 10px; display: none;">
+                        <label>Homeroom Class</label>
+                        <select name="homeroom_classid" id="homeroomClassSelect" class="form-control">
+                            <option value="" disabled selected>Choose Homeroom Class</option>
+                            <?php foreach ($classes as $c) { ?>
+                                <option value="<?= $c->classid ?>" {{ old('homeroom_classid') == $c->classid ? 'selected' : '' }}>
+                                    <?= $c->gradename . ' ' . $c->classname . ' (' . ($c->majorname ?? 'No Major') . ')' ?>
+                                </option>
+                            <?php } ?>
+                        </select>
+                        <div class="invalid-feedback" id="error-homeroom_classid"></div>
+                    </div>
+
+                    <div id="gradeWrapper" style="margin-top: 10px; display: none;">
+                        <label>Grade (For Counselling Teacher)</label>
+                        <select name="counsel_gradeid" id="gradeSelect" class="form-control">
+                            <option value="" disabled selected>Choose Grade</option>
+                            <?php foreach ($grades as $g) { ?>
+                                <option value="<?= $g->gradeid ?>" {{ old('counsel_gradeid') == $g->gradeid ? 'selected' : '' }}>
+                                    <?= $g->gradename ?>
+                                </option>
+                            <?php } ?>
+                        </select>
+                        <div class="invalid-feedback" id="error-counsel_gradeid"></div>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="submit" class="btn btn-primary" id="btnSaveUser">Save changes</button>
@@ -205,7 +231,12 @@
     const levelSelect = document.getElementById('levelSelect');
     const roleSelect = document.getElementById('roleSelect');
     const classWrapper = document.getElementById('classWrapper');
+    const classSelect = document.getElementById('classSelect');
     const roleWrapper = document.getElementById('roleWrapper');
+    const homeroomClassWrapper = document.getElementById('homeroomClassWrapper');
+    const homeroomClassSelect = document.getElementById('homeroomClassSelect');
+    const gradeWrapper = document.getElementById('gradeWrapper');
+    const gradeSelect = document.getElementById('gradeSelect');
 
     function updateRoleOptions() {
         if (!levelSelect) return;
@@ -224,12 +255,15 @@
             if (roleSelect) roleSelect.disabled = false;
             if (roleWrapper) roleWrapper.style.display = 'block';
             if (classWrapper) classWrapper.style.display = 'none';
+            if (homeroomClassWrapper) homeroomClassWrapper.style.display = 'none';
+            if (gradeWrapper) gradeWrapper.style.display = 'none';
         } 
         else if (level == 2) { // Teacher
             disableRole([1,2]); // Disable Employer roles
             if (roleSelect) roleSelect.disabled = false;
             if (roleWrapper) roleWrapper.style.display = 'block';
             if (classWrapper) classWrapper.style.display = 'none';
+            toggleRoleDependentFields(); // Check if homeroom/grade logic applies
         } 
         else if (level == 3) { // Student
             if (roleSelect) {
@@ -238,11 +272,14 @@
             }
             if (roleWrapper) roleWrapper.style.display = 'none';
             if (classWrapper) classWrapper.style.display = 'block';
+            if (homeroomClassWrapper) homeroomClassWrapper.style.display = 'none';
+            if (gradeWrapper) gradeWrapper.style.display = 'none';
         } 
         else {
             if (roleSelect) roleSelect.disabled = false;
             if (roleWrapper) roleWrapper.style.display = 'block';
             if (classWrapper) classWrapper.style.display = 'none';
+            toggleRoleDependentFields();
         }
     }
 
@@ -253,7 +290,6 @@
             if (roleIds.includes(val)) {
                 roleSelect.options[i].disabled = true;
 
-                // kalau yang ke-select ternyata di-disable → reset
                 if (roleSelect.value == val) {
                     roleSelect.value = "";
                 }
@@ -261,8 +297,36 @@
         }
     }
 
+    function toggleRoleDependentFields() {
+        if (!roleSelect) return;
+        
+        // Reset defaults
+        if (homeroomClassWrapper) homeroomClassWrapper.style.display = 'none';
+        if (homeroomClassSelect) {
+            homeroomClassSelect.disabled = true;
+            homeroomClassSelect.value = '';
+        }
+        if (gradeWrapper) gradeWrapper.style.display = 'none';
+        if (gradeSelect) {
+            gradeSelect.disabled = true;
+            gradeSelect.value = '';
+        }
+
+        if (roleSelect.value == 4) { // Homeroom Teacher
+            if (homeroomClassWrapper) homeroomClassWrapper.style.display = 'block';
+            if (homeroomClassSelect) homeroomClassSelect.disabled = false;
+        } else if (roleSelect.value == 3) { // Counselling Teacher
+            if (gradeWrapper) gradeWrapper.style.display = 'block';
+            if (gradeSelect) gradeSelect.disabled = false;
+        }
+    }
+
     if (levelSelect) {
         levelSelect.addEventListener('change', updateRoleOptions);
+    }
+    
+    if (roleSelect) {
+        roleSelect.addEventListener('change', toggleRoleDependentFields);
     }
 
     // jalan saat pertama load (old value)

@@ -54,6 +54,9 @@
                             @endif
                         </tbody>
                     </table>
+                    <div class="d-flex justify-content-center mt-3">
+                        {{ $rows->links('pagination::bootstrap-4') }}
+                    </div>
                 </div>
             </div>
         </div>
@@ -68,6 +71,14 @@
     var checkAllWrap = document.getElementById('selectAllWrap');
     var checkAll = document.getElementById('checkAll');
     var btnReadAll = document.getElementById('btnReadAll');
+    function updateNavbarCount(decrementBy) {
+        var badge = document.querySelector('.notify-no');
+        if (badge) {
+            var current = parseInt(badge.textContent) || 0;
+            var newVal = Math.max(0, current - decrementBy);
+            badge.textContent = newVal;
+        }
+    }
     function updateDeleteEnabled(){
         var ids = [];
         var rows = document.querySelectorAll('#notifBody tr');
@@ -119,10 +130,17 @@
         }).then(r => r.json()).then(data => {
             if (data.success) {
                 // remove rows
+                var unreadDeleted = 0;
                 for (var i=0;i<ids.length;i++){
                     var tr = document.querySelector('#notifBody tr[data-id="'+ids[i]+'"]');
-                    if (tr) tr.parentNode.removeChild(tr);
+                    if (tr) {
+                        if (tr.getAttribute('data-read') === '0') {
+                            unreadDeleted++;
+                        }
+                        tr.parentNode.removeChild(tr);
+                    }
                 }
+                updateNavbarCount(unreadDeleted);
                 alert('Deleted '+ids.length+' notifications');
                 updateDeleteEnabled();
             } else {
@@ -145,6 +163,7 @@
                 if (data.success) {
                     e.target.disabled = true;
                     tr.setAttribute('data-read','1');
+                    updateNavbarCount(1);
                 } else {
                     alert(data.message || 'Failed to mark read');
                 }
@@ -164,6 +183,8 @@
                 for (var i=0;i<buttons.length;i++){ buttons[i].disabled = true; }
                 var trs = document.querySelectorAll('#notifBody tr');
                 for (var j=0;j<trs.length;j++){ trs[j].setAttribute('data-read','1'); }
+                var badge = document.querySelector('.notify-no');
+                if (badge) badge.textContent = '0';
                 alert('All notifications marked as read');
             } else {
                 alert(data.message || 'Failed to mark all read');

@@ -342,7 +342,7 @@ class Ctrl extends Controller
         $email = $request->email;
         $userid = $this->findUserIdByEmail($email);
         if (!$userid) {
-            return back()->with('error','Email tidak ditemukan');
+            return back()->with('error','Email not found');
         }
         if (!Schema::hasTable('password_resets_app')) {
             Schema::create('password_resets_app', function($table){
@@ -375,12 +375,12 @@ class Ctrl extends Controller
         }
         $link = url('/reset-password') . '?token=' . urlencode($token) . '&email=' . urlencode($email);
         try {
-            Mail::raw("Klik tautan berikut untuk reset password: ".$link, function($m) use ($email){
+            Mail::raw("Click the following link to reset your password: ".$link, function($m) use ($email){
                 $m->to($email)->subject('Reset Password');
             });
         } catch (\Exception $e) {
         }
-        return back()->with('success','Link reset sudah dikirim ke email jika tersedia');
+        return back()->with('success','Reset link has been sent to your email if available');
     }
 
     public function resetPasswordForm(Request $request){
@@ -388,17 +388,17 @@ class Ctrl extends Controller
         $token = $request->query('token');
         $email = $request->query('email');
         if (!$token || !$email) {
-            return redirect('/forgot-password')->with('error','Permintaan tidak valid');
+            return redirect('/forgot-password')->with('error','Invalid request');
         }
         if (!Schema::hasTable('password_resets_app')) {
-            return redirect('/forgot-password')->with('error','Token tidak valid');
+            return redirect('/forgot-password')->with('error','Invalid token');
         }
         $rec = DB::table('password_resets_app')->where('email',$email)->where('token',$token)->first();
         if (!$rec) {
-            return redirect('/forgot-password')->with('error','Token tidak ditemukan');
+            return redirect('/forgot-password')->with('error','Token not found');
         }
         if ($rec->expires_at && strtotime($rec->expires_at) < time()) {
-            return redirect('/forgot-password')->with('error','Token kedaluwarsa');
+            return redirect('/forgot-password')->with('error','Token expired');
         }
         echo view('all.header', compact('system'));
         echo view('all.reset_password', ['method'=>'email','token'=>$token,'email'=>$email]);
@@ -412,20 +412,20 @@ class Ctrl extends Controller
             'password' => 'required|min:6|confirmed'
         ]);
         if (!Schema::hasTable('password_resets_app')) {
-            return redirect('/forgot-password')->with('error','Token tidak valid');
+            return redirect('/forgot-password')->with('error','Invalid token');
         }
         $rec = DB::table('password_resets_app')->where('email',$request->email)->where('token',$request->token)->first();
         if (!$rec) {
-            return redirect('/forgot-password')->with('error','Token tidak ditemukan');
+            return redirect('/forgot-password')->with('error','Token not found');
         }
         if ($rec->expires_at && strtotime($rec->expires_at) < time()) {
-            return redirect('/forgot-password')->with('error','Token kedaluwarsa');
+            return redirect('/forgot-password')->with('error','Token expired');
         }
         DB::table('user')->where('userid',$rec->userid)->update([
             'password' => Hash::make($request->password)
         ]);
         DB::table('password_resets_app')->where('id',$rec->id)->delete();
-        return redirect('/login')->with('success','Password berhasil diubah, silakan login');
+        return redirect('/login')->with('success','Password changed successfully, please login');
     }
 
     public function forgotPasswordByPhone(Request $request){
@@ -433,7 +433,7 @@ class Ctrl extends Controller
         $phone = $request->phone;
         $userid = $this->findUserIdByPhone($phone);
         if (!$userid) {
-            return back()->with('error','Nomor telepon tidak ditemukan');
+            return back()->with('error','Phone number not found');
         }
         $otp = str_pad((string)random_int(0, 999999), 6, '0', STR_PAD_LEFT);
         Session::put('password_reset_phone', [
@@ -447,28 +447,28 @@ class Ctrl extends Controller
             try {
                 Http::withHeaders(['Authorization'=>$token])->asForm()->post('https://api.fonnte.com/send',[
                     'target'=>$phone,
-                    'message'=>"Kode reset password: {$otp}. Berlaku 10 menit.",
+                    'message'=>"Reset password code: {$otp}. Valid for 10 minutes.",
                     'countryCode'=>'62'
                 ]);
             } catch (\Exception $e) {
             }
         }
-        return redirect('/reset-password/phone?phone='.urlencode($phone))->with('success','OTP sudah dikirim');
+        return redirect('/reset-password/phone?phone='.urlencode($phone))->with('success','OTP has been sent to your WhatsApp');
     }
 
     public function resetPasswordPhoneForm(Request $request){
         $system = DB::table('system')->first();
         $phone = $request->query('phone');
         if (!$phone) {
-            return redirect('/forgot-password')->with('error','Permintaan tidak valid');
+            return redirect('/forgot-password')->with('error','Invalid request');
         }
         $pending = Session::get('password_reset_phone');
         if (!$pending || $pending['phone'] !== $phone) {
-            return redirect('/forgot-password')->with('error','Tidak ada permintaan OTP');
+            return redirect('/forgot-password')->with('error','No OTP request found');
         }
         if (time() > $pending['expires_at']) {
             Session::forget('password_reset_phone');
-            return redirect('/forgot-password')->with('error','OTP kedaluwarsa');
+            return redirect('/forgot-password')->with('error','OTP expired');
         }
         echo view('all.header', compact('system'));
         echo view('all.reset_password', ['method'=>'phone','phone'=>$phone]);
@@ -483,20 +483,20 @@ class Ctrl extends Controller
         ]);
         $pending = Session::get('password_reset_phone');
         if (!$pending || $pending['phone'] !== $request->phone) {
-            return redirect('/forgot-password')->with('error','Tidak ada permintaan OTP');
+            return redirect('/forgot-password')->with('error','No OTP request found');
         }
         if (time() > $pending['expires_at']) {
             Session::forget('password_reset_phone');
-            return redirect('/forgot-password')->with('error','OTP kedaluwarsa');
+            return redirect('/forgot-password')->with('error','OTP expired');
         }
         if ($request->otp !== $pending['otp']) {
-            return back()->with('error','OTP tidak sesuai');
+            return back()->with('error','Invalid OTP');
         }
         DB::table('user')->where('userid',$pending['userid'])->update([
             'password'=>Hash::make($request->password)
         ]);
         Session::forget('password_reset_phone');
-        return redirect('/login')->with('success','Password berhasil diubah, silakan login');
+        return redirect('/login')->with('success','Password changed successfully, please login');
     }
 
     public function loadactivation(){
@@ -520,7 +520,7 @@ class Ctrl extends Controller
             ->leftJoin('grade', 'grade.gradeid', '=', 'counceltc.gradeid')
             ->where('teacher.roleid', '3')
             ->select('teacher.*', 'grade.gradename')
-            ->limit(8)
+            ->limit(16)
             ->get();
         foreach ($teachers as $t) {
             $t->schedules = DB::table('schedule')
@@ -583,9 +583,10 @@ class Ctrl extends Controller
             ->leftJoin('major', 'major.majorid', '=', 'class.majorid')
             ->select('class.classid', 'class.classname', 'grade.gradename', 'major.majorname')
             ->get();
+        $grades = DB::table('grade')->get();
         echo view ('all.header',compact('system'));
         echo view ('all.menu', compact('system'));
-        echo view ('admin.userdata',compact('data','level','role','classes'));
+        echo view ('admin.userdata',compact('data','level','role','classes','grades'));
         echo view ('all.footer');
     }
 
@@ -665,6 +666,29 @@ class Ctrl extends Controller
             ]);
 
             if ($request->role == 3) {
+                // Counselling Teacher logic
+                $counselValidator = Validator::make($request->all(), [
+                    'counsel_gradeid' => 'required|exists:grade,gradeid'
+                ]);
+
+                if ($counselValidator->fails()) {
+                    DB::rollBack();
+                    if ($request->ajax()) {
+                        return response()->json(['success' => false, 'errors' => $counselValidator->errors()], 422);
+                    }
+                    return redirect()->back()
+                        ->withErrors($counselValidator)
+                        ->withInput()
+                        ->with('error', 'Please select a grade for counselling teacher');
+                }
+
+                // Insert into counceltc
+                DB::table('counceltc')->insert([
+                    'teacherid' => $teacherid,
+                    'gradeid' => $request->counsel_gradeid
+                ]);
+
+                // Also insert default schedule
                 $days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
                 foreach ($days as $day) {
                     $startTime = '08:00:00';
@@ -680,6 +704,27 @@ class Ctrl extends Controller
                         'updated_at' => now(),
                     ]);
                 }
+            } elseif ($request->role == 4) {
+                // Homeroom Teacher logic
+                $homeroomValidator = Validator::make($request->all(), [
+                    'homeroom_classid' => 'required|exists:class,classid'
+                ]);
+
+                if ($homeroomValidator->fails()) {
+                    DB::rollBack();
+                    if ($request->ajax()) {
+                        return response()->json(['success' => false, 'errors' => $homeroomValidator->errors()], 422);
+                    }
+                    return redirect()->back()
+                        ->withErrors($homeroomValidator)
+                        ->withInput()
+                        ->with('error', 'Please select a homeroom class');
+                }
+
+                DB::table('homeroomtc')->insert([
+                    'teacherid' => $teacherid,
+                    'classid' => $request->homeroom_classid
+                ]);
             }
         }
 
@@ -2207,7 +2252,7 @@ class Ctrl extends Controller
             created_at DATETIME NOT NULL
         )');
         $system = DB::table('system')->first();
-        $rows = DB::table('notifications')->where('userid',$uid)->orderBy('created_at','desc')->limit(200)->get();
+        $rows = DB::table('notifications')->where('userid',$uid)->orderBy('created_at','desc')->paginate(20);
         echo view ('all.header',compact('system'));
         echo view ('all.menu',compact('system'));
         echo view ('all.notifications', compact('rows'));
@@ -2468,14 +2513,18 @@ class Ctrl extends Controller
         $system = DB::table('system')->first();
         $userid = $request->session()->get('userid');
 
+        if (!$userid) {
+            return redirect('/login')->with('error', 'Please login first');
+        }
+
         $data = DB::table('user')
             ->leftJoin('student', 'student.userid', '=', 'user.userid')
             ->leftJoin('employer', 'employer.userid', '=', 'user.userid')
             ->leftJoin('teacher', 'teacher.userid', '=', 'user.userid')
 
-            ->leftJoin('class', 'class.classid', '=', 'student.studentid')
-            ->leftJoin('major', 'major.majorid', '=', 'class.classid')
-            ->leftJoin('grade', 'grade.gradeid', '=', 'class.classid')
+            ->leftJoin('class', 'class.classid', '=', 'student.classid')
+            ->leftJoin('major', 'major.majorid', '=', 'class.majorid')
+            ->leftJoin('grade', 'grade.gradeid', '=', 'class.gradeid')
             ->leftJoin('level', 'level.levelid', '=', 'user.levelid')
 
             ->select(
@@ -2581,57 +2630,74 @@ class Ctrl extends Controller
             ->where('userid', $userid)
             ->update([
                 'name' => $request->name,
-                // email handled by verification flow
             ]);
 
         DB::table('employer')
             ->where('userid', $userid)
             ->update([
                 'name' => $request->name,
-                // email handled by verification flow
             ]);
 
         DB::table('teacher')
             ->where('userid', $userid)
             ->update([
                 'name' => $request->name,
-                // email handled by verification flow
             ]);
 
-        $newEmail = $request->email;
-        if ($newEmail) {
-            $table = $level == 3 ? 'student' : ($level == 2 ? 'teacher' : 'employer');
-            $currentEmail = DB::table($table)->where('userid', $userid)->value('email');
-            if ($currentEmail !== $newEmail) {
-                $exists = DB::table('student')->where('email', $newEmail)->exists()
-                    || DB::table('teacher')->where('email', $newEmail)->exists()
-                    || DB::table('employer')->where('email', $newEmail)->exists();
-                if ($exists) {
-                    return back()->with('error', 'Email already in use');
-                }
-                $token = Str::random(40);
-                DB::table('email_changes')->insert([
-                    'userid' => $userid,
-                    'new_email' => $newEmail,
-                    'token' => $token,
-                    'expires_at' => now()->addDay(),
-                    'created_at' => now(),
-                    'updated_at' => now()
-                ]);
-                $verifyUrl = url('/myprofile/verify-email') . '?token=' . $token;
-                try {
-                    Mail::raw("Klik tautan ini untuk verifikasi perubahan email: {$verifyUrl}", function($m) use ($newEmail) {
-                        $m->to($newEmail)->subject('Verifikasi Perubahan Email');
-                    });
-                } catch (\Exception $e) {
-                    // ignore send error
-                }
-                return back()->with('success', 'Verification email sent to the new address. Please check your inbox.');
-            }
+        $this->logActivity($request, 'update_profile', $userid, null, null, 'name=' . ($request->name ?? ''));
+        return back()->with('success', 'Profile updated');
+    }
+
+    public function requestEmailChange(Request $request) {
+        $userid = session('userid');
+        $level = session('level');
+        $newEmail = $request->new_email;
+
+        if (!$newEmail) {
+            return back()->with('error', 'New email is required');
         }
 
-        $this->logActivity($request, 'update_profile', $userid, null, null, 'name=' . ($request->name ?? ''));
-        return back()->with('success', 'Profile updated (no email change)');
+        if (!filter_var($newEmail, FILTER_VALIDATE_EMAIL)) {
+            return back()->with('error', 'Invalid email format');
+        }
+
+        $table = $level == 3 ? 'student' : ($level == 2 ? 'teacher' : 'employer');
+        $currentEmail = DB::table($table)->where('userid', $userid)->value('email');
+        
+        if ($currentEmail === $newEmail) {
+            return back()->with('error', 'New email must be different from current email');
+        }
+
+        $exists = DB::table('student')->where('email', $newEmail)->exists()
+            || DB::table('teacher')->where('email', $newEmail)->exists()
+            || DB::table('employer')->where('email', $newEmail)->exists();
+        
+        if ($exists) {
+            return back()->with('error', 'Email already in use');
+        }
+
+        $token = Str::random(40);
+        DB::table('email_changes')->insert([
+            'userid' => $userid,
+            'new_email' => $newEmail,
+            'token' => $token,
+            'expires_at' => now()->addDay(),
+            'created_at' => now(),
+            'updated_at' => now()
+        ]);
+
+        $verifyUrl = url('/myprofile/verify-email') . '?token=' . $token;
+        
+        try {
+            Mail::raw("Click this link to verify your email change: {$verifyUrl}", function($m) use ($newEmail) {
+                $m->to($newEmail)->subject('Verify Email Change');
+            });
+        } catch (\Exception $e) {
+            // ignore send error
+            return back()->with('error', 'Failed to send verification email');
+        }
+
+        return back()->with('success', 'Verification link sent to ' . $newEmail . '. Please check your inbox.');
     }
 
     public function changepw(Request $request){
@@ -2694,7 +2760,7 @@ class Ctrl extends Controller
                     ->asForm()
                     ->post('https://api.fonnte.com/send', [
                         'target' => $newPhone,
-                        'message' => "Kode OTP perubahan nomor: {$otp}. Berlaku 10 menit.",
+                        'message' => "Your OTP for phone number change is: {$otp}. Valid for 10 minutes.",
                         'countryCode' => '62'
                     ]);
             } catch (\Exception $e) {
@@ -2704,7 +2770,7 @@ class Ctrl extends Controller
         return response()->json(['success' => true, 'message' => 'OTP sent to WhatsApp']);
     }
 
-    public function confirmPhoneOtp(Request $request) {
+    public function verifyPhoneOtp(Request $request) {
         $userid = session('userid');
         $level = session('level');
         $inputOtp = $request->otp;
@@ -2823,18 +2889,57 @@ class Ctrl extends Controller
 
 //========================================================================================
 
-    public function teacherlist(){
+    private function checkActiveBooking() {
+        if (session('level') == 3) {
+            $stu = DB::table('student')->where('userid', session('userid'))->first();
+            if ($stu) {
+                return DB::table('consult')
+                    ->where('studentid', $stu->studentid)
+                    ->whereIn('status', ['pending','active'])
+                    ->exists();
+            }
+        }
+        return false;
+    }
+
+    public function teacherlist(Request $request){
         $system = DB::table('system')->first();
         $this->cancelExpiredConsultations();
         
-        $teachers = DB::table('teacher')
+        $query = DB::table('teacher')
             ->leftJoin('homeroomtc', 'homeroomtc.teacherid', '=', 'teacher.teacherid')
             ->leftJoin('counceltc', 'counceltc.teacherid', '=', 'teacher.teacherid')
             ->leftJoin('grade', 'grade.gradeid', '=', 'counceltc.gradeid')
             ->where('teacher.roleid', '3')
-            ->select('teacher.*', 'grade.gradename')
-            ->get();
+            ->select('teacher.*', 'grade.gradename');
 
+        if ($request->ajax()) {
+            if ($request->has('search') && $request->search != '') {
+                $s = $request->search;
+                $query->where(function($q) use ($s){
+                    $q->where('teacher.name', 'like', "%$s%")
+                      ->orWhere('grade.gradename', 'like', "%$s%");
+                });
+            }
+            if ($request->has('gradeid') && $request->gradeid != '') {
+                $query->where('grade.gradeid', $request->gradeid);
+            }
+            
+            $teachers = $query->paginate(20);
+            
+            foreach ($teachers as $teacher) {
+                $teacher->schedules = DB::table('schedule')
+                    ->where('teacherid', $teacher->teacherid)
+                    ->where('status', 1)
+                    ->get();
+            }
+            
+            $html = view('student.teacher_data', ['data' => $teachers, 'hasActiveBooking' => $this->checkActiveBooking()])->render();
+            return response()->json(['html' => $html, 'pagination' => (string)$teachers->links('pagination::bootstrap-4')]);
+        }
+
+        // Initial Load (limit 20)
+        $teachers = $query->paginate(20);
         foreach ($teachers as $teacher) {
             $teacher->schedules = DB::table('schedule')
                 ->where('teacherid', $teacher->teacherid)
@@ -2842,24 +2947,20 @@ class Ctrl extends Controller
                 ->get();
         }
 
-        $hasActiveBooking = false;
-        if (session('level') == 3) {
-            $stu = DB::table('student')->where('userid', session('userid'))->first();
-            if ($stu) {
-                $hasActiveBooking = DB::table('consult')
-                    ->where('studentid', $stu->studentid)
-                    ->whereIn('status', ['pending','active'])
-                    ->exists();
-            }
-        }
+        $hasActiveBooking = $this->checkActiveBooking();
+        $grades = DB::table('grade')->get();
+
         echo view('all.header', compact('system'));
         echo view('all.menu', compact('system'));
-        echo view('student.teacherlist', ['data' => $teachers, 'hasActiveBooking'=>$hasActiveBooking]);
+        echo view('student.teacherlist', ['data' => $teachers, 'hasActiveBooking'=>$hasActiveBooking, 'grades'=>$grades]);
         echo view('all.footer');
     }
     private function cancelExpiredConsultations() {
-        $nowDate = date('Y-m-d');
-        $nowTime = date('H:i:s');
+        $nowJakarta = now('Asia/Jakarta');
+        $nowDate = $nowJakarta->format('Y-m-d');
+        $nowTime = $nowJakarta->format('H:i:s');
+
+        // 1. Cancel Pending that expired
         $rows = DB::table('consult')
             ->join('time_slots','time_slots.slotid','=','consult.slotid')
             ->where('consult.status','pending')
@@ -2880,6 +2981,26 @@ class Ctrl extends Controller
             if ($teacherUser) $this->pushNotification($teacherUser,'Consultation Expired','A pending consultation request expired without approval');
             $msg = "**Action:** auto_cancel_consult\n**Slot:** ".$r->date." ".$r->start_time."-".$r->end_time;
             $this->sendDiscordWebhook($msg);
+        }
+
+        // 2. Complete Active that finished
+        $activeRows = DB::table('consult')
+            ->join('time_slots','time_slots.slotid','=','consult.slotid')
+            ->where('consult.status','active')
+            ->where(function($q) use ($nowDate,$nowTime){
+                $q->where('time_slots.date','<',$nowDate)
+                  ->orWhere(function($w) use ($nowDate,$nowTime){
+                      $w->where('time_slots.date',$nowDate)->where('time_slots.end_time','<=',$nowTime);
+                  });
+            })
+            ->select('consult.consultid')
+            ->get();
+
+        foreach ($activeRows as $r) {
+            DB::table('consult')->where('consultid', $r->consultid)->update([
+                'status' => 'completed', 
+                'updated_at' => now()
+            ]);
         }
     }
 
@@ -2988,14 +3109,16 @@ class Ctrl extends Controller
 
             $slots = [];
             $currentTimestamp = time();
-            $isToday = ($date == date('Y-m-d'));
+            $nowJakarta = now('Asia/Jakarta');
+            $isToday = ($date == $nowJakarta->format('Y-m-d'));
+            $currentTimeStr = $nowJakarta->format('H:i:s');
 
             foreach ($existingSlots as $slot) {
-                // Gunakan format jam yang sama untuk perbandingan (H:i:s)
-                $currentTimeStr = date('H:i:s');
+                // Ensure correct format for comparison
+                $slotStart = date('H:i:s', strtotime($slot->start_time));
                 // Jika hari ini, slot dianggap lewat jika waktu mulainya kurang dari atau sama dengan waktu sekarang
-                // Tambahkan buffer kecil (misal 1 menit) jika perlu, tapi strict comparison sudah cukup
-                $isPast = $isToday && ($slot->start_time <= $currentTimeStr);
+                // Tambahkan buffer 1 menit jika perlu, tapi logic <= harusnya cukup
+                $isPast = $isToday && ($slotStart <= $currentTimeStr);
 
                 $slots[] = [
                     'slotid' => $slot->slotid,
@@ -3171,6 +3294,12 @@ class Ctrl extends Controller
             )
             ->orderBy('consul_message.created_at', 'asc')
             ->get();
+
+        $userid = session('userid');
+        foreach ($messages as $m) {
+            // Remove delete capability
+            $m->can_delete = false;
+        }
 
         $statusData = DB::table('consult')->where('consultid', $id)->select('status', 'report_outcome', 'need_follow_up')->first();
 

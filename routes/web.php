@@ -32,10 +32,11 @@ Route::post('/teacher/add', 'App\Http\Controllers\Ctrl@addTeacher');
 
 Route::get('/myprofile', 'App\Http\Controllers\Ctrl@profile');
 Route::post('/myprofile/update', 'App\Http\Controllers\Ctrl@updateprofile');
-Route::post('/myprofile/changepw', 'App\Http\Controllers\Ctrl@changepw');
-Route::post('/myprofile/request-phone-otp', 'App\Http\Controllers\Ctrl@requestPhoneOtp');
-Route::post('/myprofile/confirm-phone-otp', 'App\Http\Controllers\Ctrl@confirmPhoneOtp');
 Route::post('/myprofile/update-schedule', 'App\Http\Controllers\Ctrl@updateSchedule');
+Route::post('/myprofile/request-phone-otp', 'App\Http\Controllers\Ctrl@requestPhoneOtp');
+Route::post('/myprofile/verify-phone-otp', 'App\Http\Controllers\Ctrl@verifyPhoneOtp');
+Route::post('/myprofile/request-email-change', 'App\Http\Controllers\Ctrl@requestEmailChange');
+Route::post('/myprofile/changepw', 'App\Http\Controllers\Ctrl@changePassword');
 Route::get('/myprofile/verify-email', 'App\Http\Controllers\Ctrl@verifyEmailChange');
 
 Route::get('/setting', 'App\Http\Controllers\Ctrl@setting');

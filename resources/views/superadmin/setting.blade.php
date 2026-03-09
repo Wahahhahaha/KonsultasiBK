@@ -26,8 +26,7 @@
                 <!-- ============================================================== -->
                         <div class="card">
                             <div class="card-body">
-                                <h4 class="card-title">Default Input</h4>
-                                <h6 class="card-subtitle">To use add <code>form-control</code> class to the input</h6>
+
                                 <form class="mt-4" action="/setting/update" method="post" enctype="multipart/form-data">
                                     @csrf
                                     <input type="hidden" name="systemid" value="<?= $system->systemid ?>">

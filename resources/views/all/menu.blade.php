@@ -63,7 +63,7 @@
                                                 try {
                                                     $uid = session('userid');
                                                     if ($uid) {
-                                                        $rows = DB::table('notifications')->where('userid',$uid)->orderBy('created_at','desc')->limit(10)->get();
+                                                        $rows = DB::table('notifications')->where('userid',$uid)->orderBy('created_at','desc')->limit(3)->get();
                                                     }
                                                 } catch (\Exception $e) {}
                                             ?>

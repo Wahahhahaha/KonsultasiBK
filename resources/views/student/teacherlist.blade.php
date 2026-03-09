@@ -32,102 +32,31 @@
                             <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addTeacherModal">Add Teacher</button>
                         </div>
                         @endif
-                        <div class="row">
-                        <?php foreach($data as $key) { ?>
-                            <div class="col-lg-3 col-md-6">
-                                <!-- Card -->
-                                <div class="card">
                         
-                                    <div class="card-body">
-                                        <h4 class="card-title"><?= $key->name ?></h4>
-                                        <div class="card-text mb-2">
-                                            <span class="badge bg-light-primary text-primary">
-                                                Class of <?= $key->gradename ?>
-                                            </span>
-                                        </div>
-                                        <div class="card-text mb-3">
-                                            <small class="text-muted font-weight-bold d-block mb-1">Schedule:</small>
-                                            <div class="schedule-list">
-                                                <?php if (count($key->schedules) > 0) { 
-                                                    $weekdaySchedules = [];
-                                                    $weekendSchedules = [];
-                                                    
-                                                    foreach ($key->schedules as $s) {
-                                                        $day = strtolower($s->day_of_week);
-                                                        $timeStr = substr($s->start_time, 0, 5) . ' - ' . substr($s->end_time, 0, 5);
-                                                        
-                                                        if (in_array($day, ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'])) {
-                                                            $weekdaySchedules[$timeStr][] = $day;
-                                                        } else {
-                                                            $weekendSchedules[$timeStr][] = $day;
-                                                        }
-                                                    }
-
-                                                    $allWeekdays = ['monday','tuesday','wednesday','thursday','friday'];
-                                                    $weekdayTotal = 0;
-                                                    $maxCount = 0;
-                                                    $maxTime = null;
-                                                    foreach ($weekdaySchedules as $time => $days) {
-                                                        $weekdayTotal += count($days);
-                                                        if (count($days) > $maxCount) {
-                                                            $maxCount = count($days);
-                                                            $maxTime = $time;
-                                                        }
-                                                    }
-                                                    if ($weekdayTotal === 5 && $maxCount >= 4 && $maxTime) {
-                                                        echo '<div class="d-flex justify-content-between small">
-                                                                <span>Monday - Friday</span>
-                                                                <span class="text-dark font-weight-medium">'.$maxTime.'</span>
-                                                              </div>';
-                                                        foreach ($weekdaySchedules as $time => $days) {
-                                                            if ($time !== $maxTime) {
-                                                                foreach ($days as $d) {
-                                                                    echo '<div class="d-flex justify-content-between small">
-                                                                            <span>'.ucfirst($d).'</span>
-                                                                            <span class="text-dark font-weight-medium">'.$time.'</span>
-                                                                          </div>';
-                                                                }
-                                                            }
-                                                        }
-                                                    } else {
-                                                        foreach ($weekdaySchedules as $time => $days) {
-                                                            $dayLabel = (count($days) >= 5) ? 'Monday - Friday' : implode(', ', array_map('ucfirst', $days));
-                                                            echo '<div class="d-flex justify-content-between small">
-                                                                    <span>'.$dayLabel.'</span>
-                                                                    <span class="text-dark font-weight-medium">'.$time.'</span>
-                                                                  </div>';
-                                                        }
-                                                    }
-
-                                                    // Tampilkan Weekends
-                                                    foreach ($weekendSchedules as $time => $days) {
-                                                        $dayLabel = (count($days) >= 2) ? 'Saturday - Sunday' : implode(', ', array_map('ucfirst', $days));
-                                                        echo '<div class="d-flex justify-content-between small">
-                                                                <span>'.$dayLabel.'</span>
-                                                                <span class="text-dark font-weight-medium">'.$time.'</span>
-                                                              </div>';
-                                                    }
-                                                } else { ?>
-                                                    <span class="text-danger small">No schedule available</span>
-                                                <?php } ?>
-                                            </div>
-                                        </div>
-                                        <?php if(isset($hasActiveBooking) && $hasActiveBooking) { ?>
-                                            <button class="btn btn-secondary w-100" disabled>Book Consult</button>
-                                            <div class="text-muted small">You have an active consultation</div>
-                                        <?php } else { ?>
-                                            <button class="btn btn-primary btn-book w-100" 
-                                                data-bs-toggle="modal" 
-                                                data-bs-target="#bookConsult"
-                                                data-teacherid="<?= $key->teacherid ?>"
-                                                data-teachername="<?= $key->name ?>">
-                                                Book Consult
-                                            </button>
-                                        <?php } ?>
+                        <!-- Filter & Search -->
+                        <div class="card mb-3">
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-4 mb-2">
+                                        <input type="text" id="searchTeacher" class="form-control" placeholder="Search by name...">
+                                    </div>
+                                    <div class="col-md-4 mb-2">
+                                        <select id="filterGrade" class="form-control">
+                                            <option value="">All Classes</option>
+                                            @foreach($grades as $g)
+                                                <option value="{{ $g->gradeid }}">{{ $g->gradename }}</option>
+                                            @endforeach
+                                        </select>
                                     </div>
                                 </div>
                             </div>
-                  <?php } ?>
+                        </div>
+
+                        <div class="row" id="teacher-container">
+                            @include('student.teacher_data')
+                        </div>
+                        <div id="pagination-links" class="d-flex justify-content-center mt-3">
+                            {{ $data->links('pagination::bootstrap-4') }}
                         </div>
                     </div>
                 </div>
@@ -223,28 +152,93 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const bookButtons = document.querySelectorAll('.btn-book');
-    const modalTeacherName = document.getElementById('modalTeacherName');
-    const modalTeacherId = document.getElementById('modalTeacherId');
+    let searchTimer = null;
+    const searchInput = document.getElementById('searchTeacher');
+    const filterSelect = document.getElementById('filterGrade');
+    const container = document.getElementById('teacher-container');
+    const paginationContainer = document.getElementById('pagination-links');
+
+    function loadTeachers(page = 1) {
+        const search = searchInput.value;
+        const gradeid = filterSelect.value;
+        
+        // Add opacity to indicate loading
+        container.style.opacity = '0.5';
+        
+        fetch(`/teacherlist?page=${page}&search=${encodeURIComponent(search)}&gradeid=${gradeid}`, {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            container.innerHTML = data.html;
+            paginationContainer.innerHTML = data.pagination;
+            container.style.opacity = '1';
+            attachBookEvents(); // Re-attach listeners to new buttons
+        })
+        .catch(err => {
+            console.error(err);
+            container.style.opacity = '1';
+        });
+    }
+
+    searchInput.addEventListener('input', function() {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(() => loadTeachers(1), 500);
+    });
+
+    filterSelect.addEventListener('change', function() {
+        loadTeachers(1);
+    });
+
+    // Handle Pagination Clicks
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.pagination a')) {
+            e.preventDefault();
+            const href = e.target.closest('.pagination a').getAttribute('href');
+            if (href) {
+                const url = new URL(href);
+                const page = url.searchParams.get('page');
+                loadTeachers(page);
+            }
+        }
+    });
+
+    // Re-attach booking button events function
+    function attachBookEvents() {
+        const bookButtons = document.querySelectorAll('.btn-book');
+        const modalTeacherName = document.getElementById('modalTeacherName');
+        const modalTeacherId = document.getElementById('modalTeacherId');
+        const bookingDate = document.getElementById('bookingDate');
+        const bookingTime = document.getElementById('bookingTime');
+        const timeHelp = document.getElementById('timeHelp');
+
+        bookButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const teacherId = this.getAttribute('data-teacherid');
+                const teacherName = this.getAttribute('data-teachername');
+                
+                modalTeacherId.value = teacherId;
+                modalTeacherName.textContent = teacherName;
+                
+                // Reset modal state
+                bookingDate.value = '';
+                bookingTime.innerHTML = '<option value="">Select date first</option>';
+                bookingTime.disabled = true;
+                timeHelp.textContent = '';
+            });
+        });
+    }
+
+    // Initial attach
+    attachBookEvents();
+
+    // Original Booking Logic
     const bookingDate = document.getElementById('bookingDate');
+    const modalTeacherId = document.getElementById('modalTeacherId');
     const bookingTime = document.getElementById('bookingTime');
     const timeHelp = document.getElementById('timeHelp');
-
-    bookButtons.forEach(button => {
-        button.addEventListener('click', function() {
-            const teacherId = this.getAttribute('data-teacherid');
-            const teacherName = this.getAttribute('data-teachername');
-            
-            modalTeacherId.value = teacherId;
-            modalTeacherName.textContent = teacherName;
-            
-            // Reset modal state
-            bookingDate.value = '';
-            bookingTime.innerHTML = '<option value="">Select date first</option>';
-            bookingTime.disabled = true;
-            timeHelp.textContent = '';
-        });
-    });
 
     bookingDate.addEventListener('change', function() {
         const date = this.value;
@@ -274,6 +268,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 bookingTime.innerHTML = '<option value="">Choose a time slot</option>';
                 data.slots.forEach(slot => {
+                    // Skip past slots completely
+                    if (slot.is_past) {
+                        return;
+                    }
+
                     const option = document.createElement('option');
                     option.value = slot.slotid;
                     option.textContent = `${slot.start.substring(0, 5)} - ${slot.end.substring(0, 5)}`;
@@ -281,13 +280,15 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (slot.is_booked) {
                         option.disabled = true;
                         option.textContent += ' (Already Booked)';
-                    } else if (slot.is_past) {
-                        option.disabled = true;
-                        option.textContent += ' (Time Passed)';
                     }
                     
                     bookingTime.appendChild(option);
                 });
+                
+                // If all slots were past and filtered out
+                if (bookingTime.options.length === 1) {
+                    bookingTime.innerHTML = '<option value="">No available slots (Time Passed)</option>';
+                }
                 
                 bookingTime.disabled = false;
                 timeHelp.textContent = 'Each session lasts for 30 minutes.';
