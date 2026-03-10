@@ -80,8 +80,13 @@
                                                 </div>
                                             @endif
                                             <button class="btn btn-warning btn-sm" id="btn-end" onclick="endConsult()" style="display: none;">End Conversation</button>
-                                            @if(session('level') == 2)
-                                            <button class="btn btn-info btn-sm" id="btn-report" onclick="openReportModal()" style="display: none;">Submit Report</button>
+                                            <?php 
+                                                $roleRaw = strtolower(trim(session('role') ?? '')); 
+                                                $roleKey = str_replace([' ', '-'], ['_', '_'], $roleRaw);
+                                                $isCounsel = in_array($roleKey, ['counselling_teacher','counselling_tc','counsellingtc','counselling']);
+                                            ?>
+                                            @if(session('level') == 2 && (int)(session('teacher_roleid') ?? 0) === 3)
+                                            <button class="btn btn-info btn-sm" id="btn-report" onclick="openReportModal()">Submit Report</button>
                                             @endif
                                         </div>
                                     </div>
@@ -152,14 +157,14 @@
                                                     <input class="form-check-input" type="checkbox" id="need_follow_up">
                                                     <label class="form-check-label" for="need_follow_up">Needs follow-up with homeroom teacher</label>
                                                 </div>
-                                                <div class="mb-3">
+                                                <div class="mb-3" id="follow_up_notes_container" style="display: none;">
                                                     <label class="form-label">Follow-up Notes</label>
                                                     <textarea class="form-control" id="follow_up_notes" rows="3" placeholder="Details for homeroom teacher"></textarea>
                                                 </div>
                                             </div>
                                             <div class="modal-footer">
                                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                                                <button type="button" class="btn btn-primary" onclick="submitConsultReport()">Submit</button>
+                                                <button type="button" class="btn btn-primary" id="btnSubmitReport" onclick="submitConsultReport()">Submit</button>
                                             </div>
                                         </div>
                                     </div>
@@ -897,40 +902,97 @@
         });
     }
 
+    // Checkbox toggle logic for follow up
+    document.addEventListener('DOMContentLoaded', function() {
+        const needFollowUpCheck = document.getElementById('need_follow_up');
+        const followUpNotesContainer = document.getElementById('follow_up_notes_container');
+        
+        if(needFollowUpCheck){
+            needFollowUpCheck.addEventListener('change', function() {
+                if(this.checked) {
+                    if(followUpNotesContainer) followUpNotesContainer.style.display = 'block';
+                } else {
+                    if(followUpNotesContainer) followUpNotesContainer.style.display = 'none';
+                }
+            });
+        }
+    });
+
     function openReportModal() {
-        const modal = new bootstrap.Modal(document.getElementById('reportModal'));
-        modal.show();
+        // If no current consult selected, still open modal as fallback
+        if (!currentConsultId) {
+            const modal = new bootstrap.Modal(document.getElementById('reportModal'));
+            modal.show();
+            return;
+        }
+        // Check if already has report; on error, open anyway (server will enforce single report)
+        fetch(`/chat/get/${currentConsultId}`)
+            .then(r => {
+                if (!r.ok) throw new Error('Network response was not ok');
+                return r.json();
+            })
+            .then(data => {
+                if (data && data.has_report) {
+                    alert('Report already submitted for this consultation.');
+                    return;
+                }
+                const modal = new bootstrap.Modal(document.getElementById('reportModal'));
+                modal.show();
+            })
+            .catch(() => {
+                const modal = new bootstrap.Modal(document.getElementById('reportModal'));
+                modal.show();
+            });
     }
 
     function submitConsultReport() {
-        const outcome = document.getElementById('report_outcome').value.trim();
-        const needFollowUp = document.getElementById('need_follow_up').checked;
-        const notes = document.getElementById('follow_up_notes').value.trim();
-        if (!outcome) {
-            alert('Outcome is required');
+        const outcome = document.getElementById('report_outcome').value;
+        const needFollow = document.getElementById('need_follow_up').checked;
+        const notes = document.getElementById('follow_up_notes').value;
+        
+        // Simple validation
+        if(!outcome.trim()) {
+            alert('Please enter outcome');
             return;
         }
+
+        const btn = document.getElementById('btnSubmitReport');
+        btn.disabled = true;
+        btn.textContent = 'Submitting...';
+
         fetch('/chat/report', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': '{{ csrf_token() }}'
+            },
             body: JSON.stringify({
                 consultid: currentConsultId,
                 report_outcome: outcome,
-                need_follow_up: needFollowUp,
+                need_follow_up: needFollow,
                 follow_up_notes: notes
             })
-        }).then(res => res.json()).then(data => {
+        })
+        .then(r => r.json())
+        .then(data => {
+            btn.disabled = false;
+            btn.textContent = 'Submit';
+            
             if (data.success) {
-                hasReport = true;
-                const btnReport = document.getElementById('btn-report');
-                if (btnReport) btnReport.style.display = 'none';
                 const modalEl = document.getElementById('reportModal');
                 const modal = bootstrap.Modal.getInstance(modalEl);
                 modal.hide();
                 alert('Report submitted successfully');
+                location.reload();
             } else {
                 alert(data.message || 'Failed to submit report');
             }
+        })
+        .catch(err => {
+            console.error(err);
+            btn.disabled = false;
+            btn.textContent = 'Submit';
+            alert('Error submitting report');
         });
     }
 </script>

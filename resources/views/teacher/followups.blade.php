@@ -19,43 +19,23 @@
             <div class="col-12">
                 <div class="card">
                     <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table border table-striped table-bordered text-nowrap">
-                                <thead>
-                                    <tr>
-                                        <th>Student</th>
-                                        <th>Class</th>
-                                        <th>Slot</th>
-                                        <th>Counsel Teacher</th>
-                                        <th>Outcome</th>
-                                        <th>Summary</th>
-                                        <th>Submitted</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach($items as $it)
-                                    <tr>
-                                        <td>{{ $it->student_name }}<br><small class="text-muted">{{ $it->student_phone }}</small></td>
-                                        <td>{{ $it->gradename }} {{ $it->classname }}<br><small class="text-muted">{{ $it->majorname ?? 'No Major' }}</small></td>
-                                        <td>
-                                            @if($it->date)
-                                                {{ date('d M Y', strtotime($it->date)) }}<br>
-                                                <small class="text-muted">{{ substr($it->start_time,0,5) }} - {{ substr($it->end_time,0,5) }}</small>
-                                            @else
-                                                -
-                                            @endif
-                                        </td>
-                                        <td>{{ $it->counselor_name ?? '-' }}</td>
-                                        <td>{{ $it->report_outcome }}</td>
-                                        <td>{{ $it->follow_up_notes }}</td>
-                                        <td>{{ $it->report_submitted_at ? date('d M Y H:i', strtotime($it->report_submitted_at)) : '-' }}</td>
-                                    </tr>
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <select id="filterClass" class="form-control">
+                                    <option value="">All Classes</option>
+                                    @foreach($classes as $c)
+                                        <option value="{{ $c->classid }}">{{ $c->gradename }} {{ $c->classname }}</option>
                                     @endforeach
-                                </tbody>
-                            </table>
-                            @if(count($items) === 0)
-                                <div class="alert alert-info">No follow-ups assigned to you.</div>
-                            @endif
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div id="followups-container">
+                            @include('teacher.followups_data')
+                        </div>
+                        
+                        <div id="pagination-links" class="d-flex justify-content-center mt-3">
+                            {{ $items->links('pagination::bootstrap-4') }}
                         </div>
                     </div>
                 </div>
@@ -63,3 +43,50 @@
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const filterClass = document.getElementById('filterClass');
+    const container = document.getElementById('followups-container');
+    const paginationLinks = document.getElementById('pagination-links');
+
+    function loadFollowups(page = 1) {
+        const classId = filterClass.value;
+        const url = `/followups?page=${page}&classid=${classId}`;
+
+        container.style.opacity = '0.5';
+
+        fetch(url, {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            container.innerHTML = data.html;
+            paginationLinks.innerHTML = data.pagination;
+            container.style.opacity = '1';
+        })
+        .catch(err => {
+            console.error(err);
+            container.style.opacity = '1';
+        });
+    }
+
+    filterClass.addEventListener('change', function() {
+        loadFollowups(1);
+    });
+
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.pagination a')) {
+            e.preventDefault();
+            const href = e.target.closest('.pagination a').getAttribute('href');
+            if (href) {
+                const url = new URL(href);
+                const page = url.searchParams.get('page');
+                loadFollowups(page);
+            }
+        }
+    });
+});
+</script>

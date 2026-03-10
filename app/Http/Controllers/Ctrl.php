@@ -245,6 +245,7 @@ class Ctrl extends Controller
         $email = null;
         $phonenumber = null;
         $role = null;
+        $teacherRoleId = null;
 
         if ($user->levelid == 3) {
             $data = DB::table('student')->where('userid', $user->userid)->first();
@@ -281,6 +282,7 @@ class Ctrl extends Controller
                 $email = $data->email;
                 $phonenumber = $data->phonenumber;
                 $role = $data->rolename;
+                $teacherRoleId = $data->roleid;
             }
         }
 
@@ -292,6 +294,7 @@ class Ctrl extends Controller
             'email' => $email,
             'phonenumber' => $phonenumber,
             'role' => $role,
+            'teacher_roleid' => $teacherRoleId,
             'is_login' => true
         ]);
 
@@ -514,14 +517,18 @@ class Ctrl extends Controller
         $countTeachers = DB::table('teacher')->count();
         $countConsults = DB::table('consult')->whereIn('status',['active','completed'])->count();
         $this->cancelExpiredConsultations();
-        $teachers = DB::table('teacher')
+        $studentGradeId = $this->getStudentGradeId();
+        $teachersQuery = DB::table('teacher')
             ->leftJoin('homeroomtc', 'homeroomtc.teacherid', '=', 'teacher.teacherid')
             ->leftJoin('counceltc', 'counceltc.teacherid', '=', 'teacher.teacherid')
             ->leftJoin('grade', 'grade.gradeid', '=', 'counceltc.gradeid')
             ->where('teacher.roleid', '3')
-            ->select('teacher.*', 'grade.gradename')
-            ->limit(16)
-            ->get();
+            ->select('teacher.*', 'grade.gradename', 'grade.gradeid');
+        if ($studentGradeId) {
+            $teachersQuery->orderByRaw('CASE WHEN grade.gradeid = ? THEN 0 ELSE 1 END', [$studentGradeId]);
+        }
+        $teachersQuery->orderBy('teacher.name', 'asc');
+        $teachers = $teachersQuery->limit(16)->get();
         foreach ($teachers as $t) {
             $t->schedules = DB::table('schedule')
                 ->where('teacherid', $t->teacherid)
@@ -540,7 +547,7 @@ class Ctrl extends Controller
         }
         echo view ('all.header',compact('system'));
         echo view ('all.menu', compact('system'));
-        echo view ('all.home',compact('system','countUsers','countStudents','countTeachers','countConsults','teachers','hasActiveBooking'));
+        echo view ('all.home',compact('system','countUsers','countStudents','countTeachers','countConsults','teachers','hasActiveBooking','studentGradeId'));
         echo view ('all.footer');
     }
 
@@ -2902,16 +2909,32 @@ class Ctrl extends Controller
         return false;
     }
 
+    private function getStudentGradeId(): ?int {
+        if (session('level') != 3) return null;
+        $uid = session('userid');
+        if (!$uid) return null;
+        $gradeId = DB::table('student')
+            ->leftJoin('class', 'class.classid', '=', 'student.classid')
+            ->where('student.userid', $uid)
+            ->value('class.gradeid');
+        return $gradeId ? (int)$gradeId : null;
+    }
+
     public function teacherlist(Request $request){
         $system = DB::table('system')->first();
         $this->cancelExpiredConsultations();
+        $studentGradeId = $this->getStudentGradeId();
         
         $query = DB::table('teacher')
             ->leftJoin('homeroomtc', 'homeroomtc.teacherid', '=', 'teacher.teacherid')
             ->leftJoin('counceltc', 'counceltc.teacherid', '=', 'teacher.teacherid')
             ->leftJoin('grade', 'grade.gradeid', '=', 'counceltc.gradeid')
             ->where('teacher.roleid', '3')
-            ->select('teacher.*', 'grade.gradename');
+            ->select('teacher.*', 'grade.gradename', 'grade.gradeid');
+        if ($studentGradeId) {
+            $query->orderByRaw('CASE WHEN grade.gradeid = ? THEN 0 ELSE 1 END', [$studentGradeId]);
+        }
+        $query->orderBy('teacher.name', 'asc');
 
         if ($request->ajax()) {
             if ($request->has('search') && $request->search != '') {
@@ -2934,7 +2957,7 @@ class Ctrl extends Controller
                     ->get();
             }
             
-            $html = view('student.teacher_data', ['data' => $teachers, 'hasActiveBooking' => $this->checkActiveBooking()])->render();
+            $html = view('student.teacher_data', ['data' => $teachers, 'hasActiveBooking' => $this->checkActiveBooking(), 'studentGradeId' => $studentGradeId])->render();
             return response()->json(['html' => $html, 'pagination' => (string)$teachers->links('pagination::bootstrap-4')]);
         }
 
@@ -2952,7 +2975,7 @@ class Ctrl extends Controller
 
         echo view('all.header', compact('system'));
         echo view('all.menu', compact('system'));
-        echo view('student.teacherlist', ['data' => $teachers, 'hasActiveBooking'=>$hasActiveBooking, 'grades'=>$grades]);
+        echo view('student.teacherlist', ['data' => $teachers, 'hasActiveBooking'=>$hasActiveBooking, 'grades'=>$grades, 'studentGradeId' => $studentGradeId]);
         echo view('all.footer');
     }
     private function cancelExpiredConsultations() {
@@ -3008,6 +3031,14 @@ class Ctrl extends Controller
         $teacherid = $request->teacherid;
         $date = $request->date;
         $dayOfWeek = strtolower(date('l', strtotime($date)));
+
+        $studentGradeId = $this->getStudentGradeId();
+        if ($studentGradeId) {
+            $teacherGradeId = DB::table('counceltc')->where('teacherid', $teacherid)->value('gradeid');
+            if (!$teacherGradeId || (int)$teacherGradeId !== (int)$studentGradeId) {
+                return response()->json(['available' => false, 'message' => 'Teacher is not available for your grade']);
+            }
+        }
 
         DB::beginTransaction();
         try {
@@ -3168,6 +3199,15 @@ class Ctrl extends Controller
                 return back()->with('error', 'Slot is already booked or not found');
             }
 
+            $studentGradeId = DB::table('class')->where('classid', $student->classid)->value('gradeid');
+            if ($studentGradeId) {
+                $teacherGradeId = DB::table('counceltc')->where('teacherid', $slot->teacherid)->value('gradeid');
+                if (!$teacherGradeId || (int)$teacherGradeId !== (int)$studentGradeId) {
+                    DB::rollBack();
+                    return back()->with('error', 'You can only book counselling teacher for your grade');
+                }
+            }
+
             // 3. Simpan ke tabel consult
             DB::table('consult')->insert([
                 'studentid' => $student->studentid,
@@ -3301,12 +3341,17 @@ class Ctrl extends Controller
             $m->can_delete = false;
         }
 
-        $statusData = DB::table('consult')->where('consultid', $id)->select('status', 'report_outcome', 'need_follow_up')->first();
+        $statusData = DB::table('consult')->where('consultid', $id)->select('status', 'report_outcome', 'need_follow_up', 'report_submitted_at')->first();
+        $hasReport = false;
+        if ($statusData) {
+            $out = is_string($statusData->report_outcome) ? trim($statusData->report_outcome) : '';
+            $hasReport = !empty($out) || !empty($statusData->report_submitted_at);
+        }
 
         return response()->json([
             'messages' => $messages,
             'status' => $statusData ? $statusData->status : null,
-            'has_report' => $statusData ? !empty($statusData->report_outcome) : false,
+            'has_report' => $hasReport,
             'need_follow_up' => $statusData ? (bool)$statusData->need_follow_up : false
         ]);
     }
@@ -3433,6 +3478,9 @@ class Ctrl extends Controller
         if (!$teacher) {
             return response()->json(['success' => false, 'message' => 'Teacher profile not found'], 404);
         }
+        if ((int)($teacher->roleid ?? 0) !== 3) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+        }
         
         // Perbaiki pengecekan kepemilikan
         // Pastikan teacherid yang sedang login SAMA DENGAN teacherid pemilik slot
@@ -3440,6 +3488,10 @@ class Ctrl extends Controller
              // Debugging info (optional, remove in production)
              // return response()->json(['success' => false, 'message' => "Not your consultation. You are {$teacher->teacherid}, owner is {$consult->slot_teacherid}"], 403);
              return response()->json(['success' => false, 'message' => 'Not your consultation'], 403);
+        }
+        $existingReport = is_string($consult->report_outcome) ? trim($consult->report_outcome) : '';
+        if (!empty($existingReport) || !empty($consult->report_submitted_at)) {
+            return response()->json(['success' => false, 'message' => 'Report already submitted'], 409);
         }
         $needFollow = (bool)$request->need_follow_up;
         $followNotes = $request->follow_up_notes;
@@ -3534,7 +3586,8 @@ class Ctrl extends Controller
         if (!$teacher) {
             return redirect('/home');
         }
-        $items = DB::table('consult')
+        
+        $query = DB::table('consult')
             ->join('student', 'student.studentid', '=', 'consult.studentid')
             ->leftJoin('time_slots', 'time_slots.slotid', '=', 'consult.slotid')
             ->leftJoin('teacher as counselor', 'counselor.teacherid', '=', 'time_slots.teacherid')
@@ -3558,11 +3611,26 @@ class Ctrl extends Controller
                 'time_slots.start_time',
                 'time_slots.end_time'
             )
-            ->orderBy('consult.report_submitted_at', 'desc')
+            ->orderBy('consult.report_submitted_at', 'desc');
+
+        if ($request->ajax()) {
+            if ($request->has('classid') && $request->classid != '') {
+                $query->where('student.classid', $request->classid);
+            }
+            $items = $query->paginate(15);
+            $html = view('teacher.followups_data', compact('items'))->render();
+            return response()->json(['html' => $html, 'pagination' => (string)$items->links('pagination::bootstrap-4')]);
+        }
+
+        $items = $query->paginate(15);
+        $classes = DB::table('class')
+            ->leftJoin('grade', 'grade.gradeid', '=', 'class.gradeid')
+            ->select('class.classid', 'class.classname', 'grade.gradename')
             ->get();
+
         echo view('all.header', compact('system'));
         echo view('all.menu', compact('system'));
-        echo view('teacher.followups', compact('items'));
+        echo view('teacher.followups', compact('items', 'classes'));
         echo view('all.footer');
     }
 

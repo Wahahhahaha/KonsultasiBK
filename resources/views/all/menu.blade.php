@@ -91,11 +91,32 @@
                     </ul>
                 </div>
             </li>
+            <?php
+                $navName = null;
+                try {
+                    $navUid = session('userid');
+                    $navLevel = session('level');
+                    if ($navUid) {
+                        if ($navLevel == 3) {
+                            $navName = DB::table('student')->where('userid', $navUid)->value('name');
+                        } elseif ($navLevel == 2) {
+                            $navName = DB::table('teacher')->where('userid', $navUid)->value('name');
+                        } elseif ($navLevel == 1) {
+                            $navName = DB::table('employer')->where('userid', $navUid)->value('name');
+                        }
+                        if (!$navName) {
+                            $navName = DB::table('user')->where('userid', $navUid)->value('username');
+                        }
+                    }
+                } catch (\Exception $e) {
+                    $navName = null;
+                }
+            ?>
             <li class="nav-item dropdown">
                 <a class="nav-link dropdown-toggle" href="javascript:void(0)" data-bs-toggle="dropdown"
                 aria-haspopup="true" aria-expanded="false">
                 <span class="ms-2 d-none d-lg-inline-block"><span>Hello,</span> <span
-                class="text-dark">{{ session('name') }}</span> <i data-feather="chevron-down"
+                class="text-dark">{{ $navName ?? '' }}</span> <i data-feather="chevron-down"
                 class="svg-icon"></i></span>
             </a>
 

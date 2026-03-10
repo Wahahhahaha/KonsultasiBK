@@ -87,17 +87,29 @@
                         <?php } ?>
                     </div>
                 </div>
-                <?php if(isset($hasActiveBooking) && $hasActiveBooking) { ?>
-                    <button class="btn btn-secondary w-100" disabled>Book Consult</button>
-                    <div class="text-muted small">You have an active consultation</div>
-                <?php } else { ?>
-                    <button class="btn btn-primary btn-book w-100" 
-                        data-bs-toggle="modal" 
-                        data-bs-target="#bookConsult"
-                        data-teacherid="<?= $key->teacherid ?>"
-                        data-teachername="<?= $key->name ?>">
-                        Book Consult
-                    </button>
+                <?php if(session('level') == 3) { ?>
+                    <?php if(isset($hasActiveBooking) && $hasActiveBooking) { ?>
+                        <button class="btn btn-secondary w-100" disabled>Book Consult</button>
+                        <div class="text-muted small">You have an active consultation</div>
+                    <?php } else { ?>
+                        <?php
+                            $studentGradeIdLocal = isset($studentGradeId) ? (int)$studentGradeId : null;
+                            $teacherGradeIdLocal = isset($key->gradeid) ? (int)$key->gradeid : null;
+                            $canBookLocal = true;
+                            if ($studentGradeIdLocal && (!$teacherGradeIdLocal || $teacherGradeIdLocal !== $studentGradeIdLocal)) {
+                                $canBookLocal = false;
+                            }
+                        ?>
+                        <?php if($canBookLocal) { ?>
+                            <button class="btn btn-primary btn-book w-100" 
+                                data-bs-toggle="modal" 
+                                data-bs-target="#bookConsult"
+                                data-teacherid="<?= $key->teacherid ?>"
+                                data-teachername="<?= $key->name ?>">
+                                Book Consult
+                            </button>
+                        <?php } ?>
+                    <?php } ?>
                 <?php } ?>
             </div>
         </div>
