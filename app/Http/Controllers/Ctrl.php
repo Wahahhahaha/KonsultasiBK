@@ -3522,19 +3522,38 @@ class Ctrl extends Controller
 
     public function addTeacher(Request $request) {
         if (session('level') != 1) {
+            if ($request->ajax()) {
+                return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+            }
             return back()->with('error', 'Unauthorized');
         }
-        $request->validate([
+
+        $validator = Validator::make($request->all(), [
             'name' => 'required',
             'username' => 'required',
             'email' => 'required|email',
-            'phonenumber' => 'required'
+            'phonenumber' => 'required',
+            'counsel_gradeid' => 'required|exists:grade,gradeid'
         ]);
+
+        if ($validator->fails()) {
+            if ($request->ajax()) {
+                return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
+            }
+            return back()->withErrors($validator)->withInput();
+        }
+
         DB::beginTransaction();
         try {
             $existingUser = DB::table('user')->where('username', $request->username)->first();
             if ($existingUser) {
                 DB::rollBack();
+                if ($request->ajax()) {
+                    return response()->json([
+                        'success' => false,
+                        'errors' => ['username' => ['Username already exists']]
+                    ], 422);
+                }
                 return back()->with('error', 'Username already exists');
             }
             $userId = DB::table('user')->insertGetId([
@@ -3551,6 +3570,10 @@ class Ctrl extends Controller
                 'userid' => $userId
             ]);
             $teacherId = DB::table('teacher')->where('userid', $userId)->value('teacherid');
+            DB::table('counceltc')->insert([
+                'teacherid' => $teacherId,
+                'gradeid' => $request->counsel_gradeid
+            ]);
             $days = [
                 ['monday', '08:00:00', '15:00:00'],
                 ['tuesday', '08:00:00', '15:00:00'],
@@ -3572,9 +3595,15 @@ class Ctrl extends Controller
                 ]);
             }
             DB::commit();
+            if ($request->ajax()) {
+                return response()->json(['success' => true, 'message' => 'Teacher added successfully with default schedule']);
+            }
             return back()->with('success', 'Teacher added successfully with default schedule');
         } catch (\Exception $e) {
             DB::rollBack();
+            if ($request->ajax()) {
+                return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+            }
             return back()->with('error', $e->getMessage());
         }
     }

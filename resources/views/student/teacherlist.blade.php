@@ -118,31 +118,47 @@
                 <h5 class="modal-title">Add Teacher</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <form action="/teacher/add" method="post">
+            <form id="addTeacherForm" action="/teacher/add" method="post">
                 @csrf
                 <div class="modal-body">
+                    <div id="addTeacherError" class="alert alert-danger d-none"></div>
                     <div class="form-group mb-3">
                         <label>Name</label>
                         <input type="text" class="form-control" name="name" required>
+                        <div class="invalid-feedback" id="teacher-error-name"></div>
                     </div>
                     <div class="form-group mb-3">
                         <label>Username</label>
                         <input type="text" class="form-control" name="username" required>
+                        <div class="invalid-feedback" id="teacher-error-username"></div>
                     </div>
                     <div class="form-group mb-3">
                         <label>Email</label>
                         <input type="email" class="form-control" name="email" required>
+                        <div class="invalid-feedback" id="teacher-error-email"></div>
                     </div>
                     <div class="form-group mb-3">
                         <label>Phonenumber</label>
                         <input type="text" class="form-control" name="phonenumber" required>
+                        <div class="invalid-feedback" id="teacher-error-phonenumber"></div>
+                    </div>
+                    <div class="form-group mb-3">
+                        <label>Counselling Grade</label>
+                        <select class="form-control" name="counsel_gradeid" required>
+                            <option value="">Select grade</option>
+                            @foreach($grades as $g)
+                                <option value="{{ $g->gradeid }}">{{ $g->gradename }}</option>
+                            @endforeach
+                        </select>
+                        <small class="text-muted">Pilih guru ini menangani kelas X, XI, atau XII.</small>
+                        <div class="invalid-feedback" id="teacher-error-counsel_gradeid"></div>
                     </div>
                     <div class="small text-muted">
                         Default schedule will be created: Mon–Fri 08:00–15:00, Sat–Sun 08:00–12:00.
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="submit" class="btn btn-primary">Save</button>
+                    <button type="submit" class="btn btn-primary" id="btnSaveTeacher">Save</button>
                 </div>
             </form>
         </div>
@@ -233,6 +249,75 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Initial attach
     attachBookEvents();
+
+    const addTeacherForm = document.getElementById('addTeacherForm');
+    const addTeacherError = document.getElementById('addTeacherError');
+    const btnSaveTeacher = document.getElementById('btnSaveTeacher');
+
+    if (addTeacherForm) {
+        addTeacherForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            addTeacherForm.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
+            addTeacherForm.querySelectorAll('.invalid-feedback').forEach(el => el.textContent = '');
+            if (addTeacherError) {
+                addTeacherError.classList.add('d-none');
+                addTeacherError.textContent = '';
+            }
+
+            const originalText = btnSaveTeacher.textContent;
+            btnSaveTeacher.disabled = true;
+            btnSaveTeacher.textContent = 'Saving...';
+
+            fetch(addTeacherForm.action, {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json'
+                },
+                body: new FormData(addTeacherForm)
+            })
+            .then(async response => {
+                const contentType = response.headers.get('content-type') || '';
+                const payload = contentType.includes('application/json') ? await response.json() : {};
+                return { ok: response.ok, payload };
+            })
+            .then(({ ok, payload }) => {
+                btnSaveTeacher.disabled = false;
+                btnSaveTeacher.textContent = originalText;
+
+                if (ok && payload.success) {
+                    const modalEl = document.getElementById('addTeacherModal');
+                    const modal = bootstrap.Modal.getInstance(modalEl);
+                    if (modal) modal.hide();
+                    addTeacherForm.reset();
+                    loadTeachers(1);
+                    return;
+                }
+
+                const errors = payload.errors || {};
+                Object.keys(errors).forEach(field => {
+                    const input = addTeacherForm.querySelector(`[name="${field}"]`);
+                    const errorEl = document.getElementById(`teacher-error-${field}`);
+                    if (input) input.classList.add('is-invalid');
+                    if (errorEl) errorEl.textContent = errors[field][0];
+                });
+
+                if (!Object.keys(errors).length && addTeacherError) {
+                    addTeacherError.textContent = payload.message || 'Failed to add teacher';
+                    addTeacherError.classList.remove('d-none');
+                }
+            })
+            .catch(() => {
+                btnSaveTeacher.disabled = false;
+                btnSaveTeacher.textContent = originalText;
+                if (addTeacherError) {
+                    addTeacherError.textContent = 'An unexpected error occurred. Please try again.';
+                    addTeacherError.classList.remove('d-none');
+                }
+            });
+        });
+    }
 
     // Original Booking Logic
     const bookingDate = document.getElementById('bookingDate');

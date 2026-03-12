@@ -235,15 +235,14 @@
                             class="hide-menu"> Major Data
                         </span></a>
                         </li><?php } ?>
+                        <?php if($can('userdata')) { ?><li class="sidebar-item"><a href="/userdata" class="sidebar-link"><span
+                            class="hide-menu"> User data
+                        </span></a>
+                        </li><?php } ?>
                     </ul>
                 </li>
                 <?php } ?>
 
-                <?php if($can('userdata')) { ?>
-                <li class="sidebar-item"> <a class="sidebar-link sidebar-link" href="/userdata"
-                    aria-expanded="false"><i data-feather="users" class="feather-icon"></i><span
-                    class="hide-menu">User data</span></a></li>
-                <?php } ?>
 
             <?php if(!$can('login')) { ?>
                 <li class="list-divider"></li>

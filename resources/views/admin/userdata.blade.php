@@ -434,12 +434,16 @@
                     },
                     body: formData
                 })
-                .then(response => response.json())
-                .then(data => {
+                .then(async response => {
+                    const contentType = response.headers.get('content-type') || '';
+                    const data = contentType.includes('application/json') ? await response.json() : {};
+                    return { ok: response.ok, data };
+                })
+                .then(({ ok, data }) => {
                     btn.disabled = false;
                     btn.textContent = originalBtnText;
                     
-                    if (data.success) {
+                    if (ok && data.success) {
                         // Close modal without reload
                         const modalEl = document.getElementById('addUser');
                         const modal = bootstrap.Modal.getInstance(modalEl);
